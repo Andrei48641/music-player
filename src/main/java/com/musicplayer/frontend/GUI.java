@@ -22,11 +22,10 @@ public class GUI extends JFrame {
         getContentPane().setBackground(Color.BLACK);
         setLayout(new BorderLayout());
 
-        
-      playlist = AudioPlayer.getPlaylist();
+        playlist = AudioPlayer.getPlaylist();
+        //playlist = new String[]{"Sultans of Swing", "Lady Writer", "Six Blade Knife", "Romeo and Juliet", "Walk of Life"};
 
-     //playlist = new String[]{"Sultans of Swing", "Lady Writer", "Six Blade Knife", "Romeo and Juliet", "Walk of Life"}; 
-     // Menu Bar
+        // menu Bar
         JMenuBar menuBar = new JMenuBar();
 
         JMenu songMenu = new JMenu("Exit");
@@ -35,7 +34,7 @@ public class GUI extends JFrame {
         songMenu.add(exitItem);
         menuBar.add(songMenu);
 
-        // Scrollable playlist menu
+        // scrollable playlist menu
         JMenu playlistMenu = new JMenu("Playlist");
         JPopupMenu popupMenu = playlistMenu.getPopupMenu();
         popupMenu.setLayout(new BorderLayout());
@@ -58,13 +57,12 @@ public class GUI extends JFrame {
         menuBar.add(playlistMenu);
         setJMenuBar(menuBar);
 
-        // center pannel
+        // center panel
         JPanel centerPanel = new JPanel();
         centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
         centerPanel.setBackground(Color.BLACK);
         centerPanel.setBorder(BorderFactory.createEmptyBorder(30, 20, 20, 20));
 
-        
         try {
             Image scaledImg = new ImageIcon("cover.jpg").getImage()
                     .getScaledInstance(200, 200, Image.SCALE_SMOOTH);
@@ -90,15 +88,14 @@ public class GUI extends JFrame {
         centerPanel.add(artistLabel);
 
         add(centerPanel, BorderLayout.CENTER);
-      
-        //bottom pannel
-         
+
+        // bottom panel
         JPanel bottomPanel = new JPanel();
         bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
         bottomPanel.setBackground(Color.BLACK);
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 40, 20));
 
-        // progress slider 
+        // progress slider
         JPanel progressPanel = new JPanel(new BorderLayout());
         progressPanel.setBackground(Color.BLACK);
         JLabel timeStart = new JLabel("00:00");
@@ -113,7 +110,47 @@ public class GUI extends JFrame {
         bottomPanel.add(progressPanel);
         bottomPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-        //controls
+           // volume control - top right hover popover
+        JPanel topRightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        topRightPanel.setBackground(Color.BLACK);
+
+        JSlider volumeSlider = new JSlider(JSlider.VERTICAL, 0, 100, 80);
+        volumeSlider.setBackground(new Color(30, 30, 30));
+        volumeSlider.setPreferredSize(new Dimension(30, 100));
+        volumeSlider.setInverted(true);
+
+        JLabel popupVolLabel = new JLabel("80%");
+        popupVolLabel.setForeground(Color.LIGHT_GRAY);
+        popupVolLabel.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        popupVolLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        volumeSlider.addChangeListener(e ->
+            popupVolLabel.setText(volumeSlider.getValue() + "%")
+        );
+
+        JPanel popupPanel = new JPanel();
+        popupPanel.setLayout(new BoxLayout(popupPanel, BoxLayout.Y_AXIS));
+        popupPanel.setBackground(new Color(30, 30, 30));
+        popupPanel.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        popupPanel.add(volumeSlider);
+        popupPanel.add(popupVolLabel);
+
+        JPopupMenu volumePopup = new JPopupMenu();
+        volumePopup.setBackground(new Color(30, 30, 30));
+        volumePopup.setBorder(BorderFactory.createLineBorder(new Color(60, 60, 60)));
+        volumePopup.add(popupPanel);
+
+        JButton volButton = createIconButton("🔊", 20);
+        volButton.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+               volumePopup.show(volButton, 0, volButton.getHeight() + 5); 
+            }
+        });
+
+        topRightPanel.add(volButton);
+        add(topRightPanel, BorderLayout.NORTH);
+        // controls
         JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
         controlsPanel.setBackground(Color.BLACK);
 
@@ -131,13 +168,13 @@ public class GUI extends JFrame {
         });
 
         // previous
-       JButton prevBtn = createIconButton("⏮", 28);
+        JButton prevBtn = createIconButton("⏮", 28);
         prevBtn.addActionListener(e -> {
             if (currentIndex > 0) {
                 startNewSong(currentIndex - 1);
             } else if (currentIndex == 0 && playlist.length > 0) {
                 // If we are on the first song, loop back to the very last song!
-                startNewSong(playlist.length - 1); 
+                startNewSong(playlist.length - 1);
             }
         });
 
@@ -157,9 +194,6 @@ public class GUI extends JFrame {
             }
         });
 
-        
-        
-
         // next
         JButton nextBtn = createIconButton("⏭", 28);
         nextBtn.addActionListener(e -> {
@@ -169,7 +203,6 @@ public class GUI extends JFrame {
         });
 
         // repeat
-
         JButton repeatBtn = createIconButton("🔁", 28);
         repeatBtn.addActionListener(e -> {
             if (currentIndex != -1) {
@@ -180,7 +213,6 @@ public class GUI extends JFrame {
         controlsPanel.add(shuffleBtn);
         controlsPanel.add(prevBtn);
         controlsPanel.add(playPauseBtn);
-        
         controlsPanel.add(nextBtn);
         controlsPanel.add(repeatBtn);
 
