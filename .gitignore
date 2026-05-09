@@ -1,0 +1,3 @@
+#files created while compiling (useless for commiting)
+*.class
+target/
