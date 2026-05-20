@@ -4,11 +4,11 @@ import javazoom.jl.player.advanced.AdvancedPlayer;
 import javazoom.jl.player.advanced.PlaybackEvent;
 import javazoom.jl.player.advanced.PlaybackListener;
 
-import javax.swing.SwingUtilities; // Crucial for the Auto-Play callback!
+import javax.swing.SwingUtilities;
 import java.io.FileInputStream;
 import java.io.BufferedInputStream;
 import java.sql.*;
-import java.util.ArrayList;
+import java.util.*;
 
 public class AudioPlayer {
 
@@ -19,20 +19,18 @@ public class AudioPlayer {
     private static int pausedFrame = 0;
     private static boolean isPaused = false;
     
-    // Auto-play and pause logic variables
     private static boolean manuallyStopped = false;
     private static Runnable onSongFinishedCallback;
 
-    // Method for the GUI to hand over its callback instructions
     public static void setOnSongFinishedCallback(Runnable callback) {
         onSongFinishedCallback = callback;
     }
 
     public static void playSong(String songTitle) {
-        stopSong(); // Kick out the old song before starting a new one
+        stopSong();
         pausedFrame = 0;
         isPaused = false;
-        manuallyStopped = false; // Reset the flag when a new song starts
+        manuallyStopped = false;
 
         currentPath = getPathFromDB(songTitle);
         if (currentPath.isEmpty()) {
@@ -46,9 +44,8 @@ public class AudioPlayer {
     public static void pauseSong() {
         if (mp3Player != null && !isPaused) {
             isPaused = true;
-            manuallyStopped = true; // Prevents the auto-play bug!
+            manuallyStopped = true;
             
-            // Safety net around JLayer's cranky stop method
             try {
                 mp3Player.stop(); 
             } catch (Exception e) {
@@ -66,7 +63,6 @@ public class AudioPlayer {
                 manuallyStopped = false; 
                 playFromFrame(pausedFrame);
             } else if (mp3Player == null) {
-                // If the song was completely finished, restart it from the beginning!
                 pausedFrame = 0;
                 manuallyStopped = false;
                 playFromFrame(0);
@@ -77,13 +73,13 @@ public class AudioPlayer {
     public static void stopSong() {
         isPaused = false;
         pausedFrame = 0;
-        manuallyStopped = true; // Prevents auto playing when we press stop
+        manuallyStopped = true;
         
         if (mp3Player != null) {
             try {
-                mp3Player.stop(); // safety net
+                mp3Player.stop();
             } catch (Exception e) {
-                
+                // Ignore
             }
             mp3Player = null;
         }
@@ -108,18 +104,15 @@ public class AudioPlayer {
                         System.out.println("NOW PLAYING from frame: " + startFrame);
                     }
 
-                  @Override
+                    @Override
                     public void playbackFinished(PlaybackEvent e) {
-                        // Track which frame we stopped at for pause/resume
                         pausedFrame = startFrame + e.getFrame();
                         System.out.println("Stopped at frame: " + pausedFrame);
                         
-                        
                         if (!manuallyStopped) {
-                            mp3Player = null; // stop player
-                            pausedFrame = 0;  // reset
-                            isPaused = false; 
-                            
+                            mp3Player = null;
+                            pausedFrame = 0;
+                            isPaused = false;
                             
                             if (onSongFinishedCallback != null) {
                                 SwingUtilities.invokeLater(onSongFinishedCallback);
@@ -139,11 +132,9 @@ public class AudioPlayer {
 
     private static String getPathFromDB(String songTitle) {
         try (Connection conn = DatabaseManager.getConnection();
-             Statement statement = conn.createStatement()) {
-
-            ResultSet rs = statement.executeQuery(
-                "SELECT FILE_PATH FROM SONGS WHERE TITLE = '" + songTitle + "'"
-            );
+             PreparedStatement stmt = conn.prepareStatement("SELECT FILE_PATH FROM SONGS WHERE TITLE = ?")) {
+            stmt.setString(1, songTitle);
+            ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
                 return rs.getString("FILE_PATH");
@@ -173,5 +164,114 @@ public class AudioPlayer {
         }
 
         return songs.toArray(new String[0]);
+    }
+
+    /**
+     * Get all artists from the database
+     */
+    public static String[] getArtists() {
+        ArrayList<String> artists = new ArrayList<>();
+
+        try (Connection conn = DatabaseManager.getConnection();
+             Statement statement = conn.createStatement()) {
+
+            ResultSet rs = statement.executeQuery(
+                "SELECT NAME FROM ARTISTS ORDER BY NAME"
+            );
+
+            while (rs.next()) {
+                artists.add(rs.getString("NAME"));
+            }
+
+        } catch (SQLException e) {
+            System.err.println("ERROR loading artists: " + e.getMessage());
+        }
+
+        return artists.toArray(new String[0]);
+    }
+
+    /**
+     * Get all albums for a specific artist
+     */
+    public static String[] getAlbumsForArtist(String artistName) {
+        ArrayList<String> albums = new ArrayList<>();
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "SELECT DISTINCT A.TITLE FROM ALBUMS A " +
+                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
+                "WHERE AR.NAME = ? ORDER BY A.TITLE")) {
+            
+            stmt.setString(1, artistName);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                albums.add(rs.getString("TITLE"));
+            }
+
+        } catch (SQLException e) {
+            System.err.println("ERROR loading albums: " + e.getMessage());
+        }
+
+        return albums.toArray(new String[0]);
+    }
+
+    /**
+     * Get all songs for a specific album and artist
+     */
+    public static String[] getSongsForAlbum(String artistName, String albumTitle) {
+        ArrayList<String> songs = new ArrayList<>();
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "SELECT S.TITLE FROM SONGS S " +
+                "JOIN ALBUMS A ON S.ALBUM_ID = A.ID " +
+                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
+                "WHERE AR.NAME = ? AND A.TITLE = ? ORDER BY S.TITLE")) {
+            
+            stmt.setString(1, artistName);
+            stmt.setString(2, albumTitle);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                songs.add(rs.getString("TITLE"));
+            }
+
+        } catch (SQLException e) {
+            System.err.println("ERROR loading songs: " + e.getMessage());
+        }
+
+        return songs.toArray(new String[0]);
+    }
+
+    /**
+     * Get song info including file path
+     */
+    public static Map<String, String> getSongInfo(String songTitle) {
+        Map<String, String> info = new HashMap<>();
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "SELECT S.TITLE, S.FILE_PATH, A.TITLE AS ALBUM, AR.NAME AS ARTIST " +
+                "FROM SONGS S " +
+                "JOIN ALBUMS A ON S.ALBUM_ID = A.ID " +
+                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
+                "WHERE S.TITLE = ?")) {
+            
+            stmt.setString(1, songTitle);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                info.put("TITLE", rs.getString("TITLE"));
+                info.put("FILE_PATH", rs.getString("FILE_PATH"));
+                info.put("ALBUM", rs.getString("ALBUM"));
+                info.put("ARTIST", rs.getString("ARTIST"));
+            }
+
+        } catch (SQLException e) {
+            System.err.println("ERROR loading song info: " + e.getMessage());
+        }
+
+        return info;
     }
 }

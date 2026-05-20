@@ -11,7 +11,7 @@ import java.sql.*;
 public class MusicScanner {
 
     public static void startScan() {
-        File root = new File("X:/10_MUSIC/ALBUMS/");
+        File root = new File("X:/10_MUSIC/Albums(320)/");
 
         if (!root.exists()) {
             System.err.println("ERROR root folder doesn't exist (check tailscale/database) " + root.getAbsolutePath());
@@ -40,16 +40,25 @@ public class MusicScanner {
 
     public static void saveToDatabase(File file) {
         try (Connection connectionObj = DatabaseManager.getConnection()) {
+            Statement statement = connectionObj.createStatement();
+
+            String linuxPath = file.getAbsolutePath().replace("X:", "/mnt/HDD1TB").replace("\\", "/");
+
+            ResultSet rs = statement
+                    .executeQuery("SELECT 1 FROM SONGS WHERE FILE_PATH = '" + linuxPath.replace("'", "''") + "'");
+            if (rs.next()) {
+                return;
+            }
+
             AudioFile audioFile = AudioFileIO.read(file);
             Tag tag = audioFile.getTag();
 
-            Statement statement = connectionObj.createStatement();
+            int artistId = getOrCreateArtist(statement, tag.getFirst(FieldKey.ARTIST).replace("'", "''"));
+            int albumId = getOrCreateAlbum(statement, tag.getFirst(FieldKey.ALBUM).replace("'", "''"), artistId);
 
-            int artistId = getOrCreateArtist(statement, tag.getFirst(FieldKey.ARTIST));
-            int albumId = getOrCreateAlbum(statement, tag.getFirst(FieldKey.ALBUM), artistId);
-            
-            String linuxPath = file.getAbsolutePath().replace("X:", "/mnt/HDD1TB").replace("\\", "/");
-            statement.execute("INSERT INTO SONGS (TITLE, ALBUM_ID, FILE_PATH) VALUES ('" + tag.getFirst(FieldKey.TITLE) + "', " + albumId + ", '" + linuxPath + "')");
+            statement.execute("INSERT INTO SONGS (TITLE, ALBUM_ID, FILE_PATH) VALUES ('"
+                    + tag.getFirst(FieldKey.TITLE).replace("'", "''") + "', " + albumId + ", '"
+                    + linuxPath.replace("'", "''") + "')");
 
             System.out.println("debug CHECKED " + tag.getFirst(FieldKey.ARTIST) + " - " + tag.getFirst(FieldKey.TITLE));
 
@@ -66,8 +75,10 @@ public class MusicScanner {
     }
 
     public static int getOrCreateAlbum(Statement statement, String title, int artistId) throws SQLException {
-        statement.execute("MERGE INTO ALBUMS (TITLE, ARTIST_ID) KEY(TITLE, ARTIST_ID) VALUES ('" + title + "', " + artistId + ")");
-        ResultSet rs = statement.executeQuery("SELECT ID FROM ALBUMS WHERE TITLE = '" + title + "' AND ARTIST_ID = " + artistId);
+        statement.execute("MERGE INTO ALBUMS (TITLE, ARTIST_ID) KEY(TITLE, ARTIST_ID) VALUES ('" + title + "', "
+                + artistId + ")");
+        ResultSet rs = statement
+                .executeQuery("SELECT ID FROM ALBUMS WHERE TITLE = '" + title + "' AND ARTIST_ID = " + artistId);
         rs.next();
         return rs.getInt("ID");
     }

@@ -1,251 +1,496 @@
 package com.musicplayer.frontend;
 
 import javax.swing.*;
+import javax.swing.table.*;
+import javax.swing.tree.*;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
+import javax.swing.plaf.basic.BasicSplitPaneDivider;
 import java.awt.*;
-import java.util.Random;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.File;
+import java.util.*;
+import java.lang.reflect.Method;
 import com.musicplayer.backend.AudioPlayer;
+import org.jaudiotagger.audio.AudioFile;
+import org.jaudiotagger.audio.AudioFileIO;
+import org.jaudiotagger.tag.Tag;
 
 public class GUI extends JFrame {
 
+    private JLabel albumArtLabel;
     private JLabel titleLabel;
     private JLabel artistLabel;
+    private JLabel albumLabel;
     private JButton playPauseBtn;
+    private JTable songTableView;
+    private JTree libraryTree;
+    private DefaultMutableTreeNode rootNode;
 
-    private String[] playlist;
-    private int currentIndex = -1;
+    private String currentSongTitle = "";
+    private String currentArtist = "";
+    private String currentAlbum = "";
     private boolean isPlaying = false;
 
     public GUI() {
-        setTitle("My Clean Music Player");
-        setSize(400, 580);
+        setTitle("bbbrfbnbbb");
+        setSize(1200, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         getContentPane().setBackground(Color.BLACK);
         setLayout(new BorderLayout());
 
-        playlist = AudioPlayer.getPlaylist();
-        //playlist = new String[]{"Sultans of Swing", "Lady Writer", "Six Blade Knife", "Romeo and Juliet", "Walk of Life"};
-
-        // menu Bar
+        // Menu Bar
         JMenuBar menuBar = new JMenuBar();
+        menuBar.setBackground(Color.BLACK);
+        menuBar.setForeground(Color.WHITE);
 
-        JMenu songMenu = new JMenu("Exit");
-        JMenuItem exitItem = new JMenuItem("Exit Player");
+        JMenu fileMenu = new JMenu("File");
+        fileMenu.setForeground(Color.WHITE);
+        JMenuItem exitItem = new JMenuItem("Exit");
         exitItem.addActionListener(e -> System.exit(0));
-        songMenu.add(exitItem);
-        menuBar.add(songMenu);
+        fileMenu.add(exitItem);
+        menuBar.add(fileMenu);
 
-        // scrollable playlist menu
-        JMenu playlistMenu = new JMenu("Playlist");
-        JPopupMenu popupMenu = playlistMenu.getPopupMenu();
-        popupMenu.setLayout(new BorderLayout());
-
-        JPanel listPanel = new JPanel();
-        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
-
-        for (int i = 0; i < playlist.length; i++) {
-            final int index = i;
-            JMenuItem songItem = new JMenuItem(playlist[i]);
-            songItem.addActionListener(e -> startNewSong(index));
-            listPanel.add(songItem);
-        }
-
-        JScrollPane scrollPane = new JScrollPane(listPanel);
-        scrollPane.setPreferredSize(new Dimension(250, 300));
-        scrollPane.setBorder(null);
-        popupMenu.add(scrollPane, BorderLayout.CENTER);
-
-        menuBar.add(playlistMenu);
         setJMenuBar(menuBar);
 
-        // center panel
-        JPanel centerPanel = new JPanel();
-        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
-        centerPanel.setBackground(Color.BLACK);
-        centerPanel.setBorder(BorderFactory.createEmptyBorder(30, 20, 20, 20));
+        // Create main content panel with split pane
+        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        mainSplitPane.setBackground(new Color(40, 40, 40));
+        mainSplitPane.setDividerLocation(300);
+        mainSplitPane.setDividerSize(8);
+        styleSplitPane(mainSplitPane);
 
-        try {
-            Image scaledImg = new ImageIcon("cover.jpg").getImage()
-                    .getScaledInstance(200, 200, Image.SCALE_SMOOTH);
-            JLabel albumArt = new JLabel(new ImageIcon(scaledImg));
-            albumArt.setAlignmentX(Component.CENTER_ALIGNMENT);
-            centerPanel.add(albumArt);
-        } catch (Exception e) {
-            System.out.println("Cover image not found, skipping album art.");
-        }
+        // LEFT PANEL - Library Tree
+        JPanel leftPanel = createLibraryPanel();
+        mainSplitPane.setLeftComponent(leftPanel);
 
-        centerPanel.add(Box.createRigidArea(new Dimension(0, 30)));
+        // RIGHT PANEL - Song List and Album Art
+        JPanel rightPanel = createSongPanel();
+        mainSplitPane.setRightComponent(rightPanel);
 
-        titleLabel = new JLabel("Ready to Play");
-        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
-        titleLabel.setForeground(Color.WHITE);
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        centerPanel.add(titleLabel);
+        add(mainSplitPane, BorderLayout.CENTER);
 
-        artistLabel = new JLabel("Select a song from Playlist");
-        artistLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
-        artistLabel.setForeground(Color.LIGHT_GRAY);
-        artistLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        centerPanel.add(artistLabel);
-
-        add(centerPanel, BorderLayout.CENTER);
-
-        // bottom panel
-        JPanel bottomPanel = new JPanel();
-        bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
-        bottomPanel.setBackground(Color.BLACK);
-        bottomPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 40, 20));
-
-        // progress slider
-        JPanel progressPanel = new JPanel(new BorderLayout());
-        progressPanel.setBackground(Color.BLACK);
-        JLabel timeStart = new JLabel("00:00");
-        timeStart.setForeground(Color.WHITE);
-        JLabel timeEnd = new JLabel("00:00");
-        timeEnd.setForeground(Color.WHITE);
-        JSlider slider = new JSlider(0, 100, 0);
-        slider.setBackground(Color.BLACK);
-        progressPanel.add(timeStart, BorderLayout.WEST);
-        progressPanel.add(slider, BorderLayout.CENTER);
-        progressPanel.add(timeEnd, BorderLayout.EAST);
-        bottomPanel.add(progressPanel);
-        bottomPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-
-           // volume control - top right hover popover
-        JPanel topRightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
-        topRightPanel.setBackground(Color.BLACK);
-
-        JSlider volumeSlider = new JSlider(JSlider.VERTICAL, 0, 100, 80);
-        volumeSlider.setBackground(new Color(30, 30, 30));
-        volumeSlider.setPreferredSize(new Dimension(30, 100));
-        volumeSlider.setInverted(true);
-
-        JLabel popupVolLabel = new JLabel("80%");
-        popupVolLabel.setForeground(Color.LIGHT_GRAY);
-        popupVolLabel.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        popupVolLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-        volumeSlider.addChangeListener(e ->
-            popupVolLabel.setText(volumeSlider.getValue() + "%")
-        );
-
-        JPanel popupPanel = new JPanel();
-        popupPanel.setLayout(new BoxLayout(popupPanel, BoxLayout.Y_AXIS));
-        popupPanel.setBackground(new Color(30, 30, 30));
-        popupPanel.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
-        popupPanel.add(volumeSlider);
-        popupPanel.add(popupVolLabel);
-
-        JPopupMenu volumePopup = new JPopupMenu();
-        volumePopup.setBackground(new Color(30, 30, 30));
-        volumePopup.setBorder(BorderFactory.createLineBorder(new Color(60, 60, 60)));
-        volumePopup.add(popupPanel);
-
-        JButton volButton = createIconButton("🔊", 20);
-        volButton.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-               volumePopup.show(volButton, 0, volButton.getHeight() + 5); 
-            }
-        });
-
-        topRightPanel.add(volButton);
-        add(topRightPanel, BorderLayout.NORTH);
-        // controls
-        JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 0));
-        controlsPanel.setBackground(Color.BLACK);
-
-        // shuffle
-        JButton shuffleBtn = createIconButton("🔀", 28);
-        shuffleBtn.addActionListener(e -> {
-            if (playlist.length > 1) {
-                Random rand = new Random();
-                int pick = currentIndex;
-                while (pick == currentIndex) {
-                    pick = rand.nextInt(playlist.length);
-                }
-                startNewSong(pick);
-            }
-        });
-
-        // previous
-        JButton prevBtn = createIconButton("⏮", 28);
-        prevBtn.addActionListener(e -> {
-            if (currentIndex > 0) {
-                startNewSong(currentIndex - 1);
-            } else if (currentIndex == 0 && playlist.length > 0) {
-                // If we are on the first song, loop back to the very last song!
-                startNewSong(playlist.length - 1);
-            }
-        });
-
-        // play/pause
-        playPauseBtn = createIconButton("▶", 36);
-        playPauseBtn.addActionListener(e -> {
-            if (currentIndex == -1) return; // nothing selected yet
-
-            if (isPlaying) {
-                AudioPlayer.pauseSong();
-                playPauseBtn.setText("▶");
-                isPlaying = false;
-            } else {
-                AudioPlayer.resumeSong();
-                playPauseBtn.setText("⏸");
-                isPlaying = true;
-            }
-        });
-
-        // next
-        JButton nextBtn = createIconButton("⏭", 28);
-        nextBtn.addActionListener(e -> {
-            if (currentIndex < playlist.length - 1) {
-                startNewSong(currentIndex + 1);
-            }
-        });
-
-        // repeat
-        JButton repeatBtn = createIconButton("🔁", 28);
-        repeatBtn.addActionListener(e -> {
-            if (currentIndex != -1) {
-                startNewSong(currentIndex);
-            }
-        });
-
-        controlsPanel.add(shuffleBtn);
-        controlsPanel.add(prevBtn);
-        controlsPanel.add(playPauseBtn);
-        controlsPanel.add(nextBtn);
-        controlsPanel.add(repeatBtn);
-
-        bottomPanel.add(controlsPanel);
+        // BOTTOM PANEL - Controls
+        JPanel bottomPanel = createControlsPanel();
         add(bottomPanel, BorderLayout.SOUTH);
 
         setLocationRelativeTo(null);
         setVisible(true);
     }
 
-    private void startNewSong(int index) {
-        currentIndex = index;
-        String songTitle = playlist[index];
+    private JPanel createLibraryPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.BLACK);
+
+        // Build library tree
+        rootNode = new DefaultMutableTreeNode("Library");
+        String[] artists = AudioPlayer.getArtists();
+
+        for (String artist : artists) {
+            DefaultMutableTreeNode artistNode = new DefaultMutableTreeNode(artist);
+            String[] albums = AudioPlayer.getAlbumsForArtist(artist);
+            
+            for (String album : albums) {
+                DefaultMutableTreeNode albumNode = new DefaultMutableTreeNode(album);
+                String[] songs = AudioPlayer.getSongsForAlbum(artist, album);
+                
+                for (String song : songs) {
+                    albumNode.add(new DefaultMutableTreeNode(song));
+                }
+                
+                artistNode.add(albumNode);
+            }
+            
+            rootNode.add(artistNode);
+        }
+
+        libraryTree = new JTree(rootNode);
+        libraryTree.setBackground(Color.BLACK);
+        libraryTree.setForeground(new Color(50, 205, 50)); // Lime green
+        libraryTree.setOpaque(true);
+        libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
+            @Override
+            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, 
+                    boolean expanded, boolean leaf, int row, boolean hasFocus) {
+                Component c = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+                setBackground(sel ? new Color(100, 100, 150) : Color.BLACK);
+                setForeground(sel ? Color.WHITE : new Color(50, 205, 50)); // lime when not selected, white when selected
+                setOpaque(true);
+                return c;
+            }
+        });
+
+        // Add double-click listener for playing songs
+        libraryTree.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    TreePath path = libraryTree.getPathForLocation(e.getX(), e.getY());
+                    if (path != null) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                        
+                        // Check if it's a song (leaf node with 3-level parent hierarchy)
+                        if (node.isLeaf() && node.getParent() != null && 
+                            node.getParent().getParent() != null) {
+                            String songTitle = node.toString();
+                            DefaultMutableTreeNode albumNode = (DefaultMutableTreeNode) node.getParent();
+                            DefaultMutableTreeNode artistNode = (DefaultMutableTreeNode) albumNode.getParent();
+                            
+                            playSong(songTitle, artistNode.toString(), albumNode.toString());
+                        }
+                    }
+                }
+            }
+        });
+
+        JScrollPane treeScroll = new JScrollPane(libraryTree);
+        treeScroll.setBackground(Color.BLACK);
+        treeScroll.getViewport().setBackground(Color.BLACK);
+        JLabel libraryLabel = new JLabel("  Library");
+        libraryLabel.setBackground(Color.BLACK);
+        libraryLabel.setForeground(new Color(50, 205, 50));
+        libraryLabel.setOpaque(true);
+        panel.add(libraryLabel, BorderLayout.NORTH);
+        panel.add(treeScroll, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private JPanel createSongPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.BLACK);
+
+        // Create table model with columns
+        String[] columnNames = {"#", "Title", "Artist"};
+        DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // Make cells non-editable
+            }
+        };
+
+        songTableView = new JTable(tableModel);
+        songTableView.setBackground(Color.BLACK);
+        songTableView.setForeground(new Color(50, 205, 50)); // Lime green
+        songTableView.setSelectionBackground(new Color(100, 100, 150));
+        songTableView.setSelectionForeground(Color.WHITE);
+        songTableView.setGridColor(new Color(50, 50, 50));
+        songTableView.setShowGrid(true);
+        songTableView.setRowHeight(25);
+        songTableView.getTableHeader().setBackground(Color.BLACK);
+        songTableView.getTableHeader().setForeground(new Color(50, 205, 50));
+        songTableView.getTableHeader().setOpaque(true);
+        
+        // Set column widths
+        songTableView.getColumnModel().getColumn(0).setPreferredWidth(40);  // Track #
+        songTableView.getColumnModel().getColumn(1).setPreferredWidth(300); // Title
+        songTableView.getColumnModel().getColumn(2).setPreferredWidth(150); // Artist
+        // songTableView.getColumnModel().getColumn(3).setPreferredWidth(80);  // Duration
+
+        songTableView.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int row = songTableView.rowAtPoint(e.getPoint());
+                    if (row >= 0) {
+                        String songTitle = (String) songTableView.getValueAt(row, 1);
+                        playSong(songTitle, currentArtist, currentAlbum);
+                    }
+                }
+            }
+        });
+
+        JScrollPane songScroll = new JScrollPane(songTableView);
+        songScroll.setBackground(Color.BLACK);
+        songScroll.getViewport().setBackground(Color.BLACK);
+
+        // Top part - Album Art + Info
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBackground(Color.BLACK);
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        albumArtLabel = new JLabel();
+        albumArtLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        albumArtLabel.setVerticalAlignment(SwingConstants.CENTER);
+        albumArtLabel.setPreferredSize(new Dimension(180, 180));
+        albumArtLabel.setBackground(new Color(20, 20, 20));
+        albumArtLabel.setOpaque(true);
+        albumArtLabel.setBorder(BorderFactory.createLineBorder(new Color(50, 50, 50), 1));
+
+        JPanel infoPanel = new JPanel();
+        infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+        infoPanel.setBackground(Color.BLACK);
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(0, 15, 0, 0));
+
+        titleLabel = new JLabel("Select a song");
+        titleLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
+        titleLabel.setForeground(Color.WHITE);
+
+        artistLabel = new JLabel("");
+        artistLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        artistLabel.setForeground(new Color(150, 150, 150));
+
+        albumLabel = new JLabel("");
+        albumLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        albumLabel.setForeground(new Color(150, 150, 150));
+
+        infoPanel.add(titleLabel);
+        infoPanel.add(Box.createRigidArea(new Dimension(0, 5)));
+        infoPanel.add(artistLabel);
+        infoPanel.add(albumLabel);
+        infoPanel.add(Box.createVerticalGlue());
+
+        topPanel.add(albumArtLabel, BorderLayout.WEST);
+        topPanel.add(infoPanel, BorderLayout.CENTER);
+
+        // Main split pane
+        JSplitPane mainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        mainSplit.setBackground(new Color(40, 40, 40));
+        mainSplit.setDividerLocation(220);
+        mainSplit.setDividerSize(8);
+        styleSplitPane(mainSplit);
+        mainSplit.setTopComponent(topPanel);
+        mainSplit.setBottomComponent(songScroll);
+
+        panel.add(mainSplit, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    private JPanel createControlsPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(Color.BLACK);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+
+        // Progress bar
+        JPanel progressPanel = new JPanel(new BorderLayout());
+        progressPanel.setBackground(Color.BLACK);
+        JLabel timeStart = new JLabel("00:00");
+        timeStart.setForeground(new Color(50, 205, 50)); // Lime green
+        JLabel timeEnd = new JLabel("00:00");
+        timeEnd.setForeground(new Color(50, 205, 50)); // Lime green
+        JSlider slider = new JSlider(0, 100, 0);
+        slider.setBackground(Color.BLACK);
+        slider.setForeground(new Color(100, 150, 200));
+        progressPanel.add(timeStart, BorderLayout.WEST);
+        progressPanel.add(slider, BorderLayout.CENTER);
+        progressPanel.add(timeEnd, BorderLayout.EAST);
+        panel.add(progressPanel);
+        panel.add(Box.createRigidArea(new Dimension(0, 10)));
+
+        // Control buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+        buttonPanel.setBackground(Color.BLACK);
+
+        JButton prevBtn = createIconButton("⏮", 24);
+        prevBtn.addActionListener(e -> playPrevious());
+
+        playPauseBtn = createIconButton("▶", 32);
+        playPauseBtn.addActionListener(e -> togglePlayPause());
+
+        JButton nextBtn = createIconButton("⏭", 24);
+        nextBtn.addActionListener(e -> playNext());
+
+        JButton repeatBtn = createIconButton("🔁", 20);
+        repeatBtn.addActionListener(e -> playCurrentAgain());
+
+        JButton shuffleBtn = createIconButton("🔀", 20);
+        shuffleBtn.addActionListener(e -> shufflePlay());
+
+        buttonPanel.add(shuffleBtn);
+        buttonPanel.add(prevBtn);
+        buttonPanel.add(playPauseBtn);
+        buttonPanel.add(nextBtn);
+        buttonPanel.add(repeatBtn);
+
+        panel.add(buttonPanel);
+
+        return panel;
+    }
+
+    private void playSong(String songTitle, String artist, String album) {
+        currentSongTitle = songTitle;
+        currentArtist = artist;
+        currentAlbum = album;
 
         titleLabel.setText(songTitle);
-        artistLabel.setText("Now Playing");
+        artistLabel.setText("Artist: " + artist);
+        albumLabel.setText("Album: " + album);
+
+        updateAlbumArt(artist, album);
 
         new Thread(() -> AudioPlayer.playSong(songTitle)).start();
 
         isPlaying = true;
         playPauseBtn.setText("⏸");
+
+        // Update song list for current album
+        updateSongList(artist, album, songTitle);
+    }
+
+    private void updateSongList(String artist, String album, String selectedSong) {
+        String[] songs = AudioPlayer.getSongsForAlbum(artist, album);
+        DefaultTableModel model = (DefaultTableModel) songTableView.getModel();
+        model.setRowCount(0); // Clear existing rows
+
+        int selectedRow = -1;
+        for (int i = 0; i < songs.length; i++) {
+            model.addRow(new Object[]{i + 1, songs[i], artist, "N/A"});
+            if (songs[i].equals(selectedSong)) {
+                selectedRow = i;
+            }
+        }
+
+        if (selectedRow >= 0) {
+            songTableView.setRowSelectionInterval(selectedRow, selectedRow);
+            songTableView.scrollRectToVisible(songTableView.getCellRect(selectedRow, 0, true));
+        }
+    }
+
+    private void updateAlbumArt(String artist, String album) {
+        new Thread(() -> {
+            try {
+                String[] songs = AudioPlayer.getSongsForAlbum(artist, album);
+                if (songs.length > 0) {
+                    Map<String, String> songInfo = AudioPlayer.getSongInfo(songs[0]);
+                    String filePath = songInfo.get("FILE_PATH");
+                    
+                    if (filePath != null && !filePath.isEmpty()) {
+                        String windowsPath = filePath.replace("/mnt/HDD1TB", "X:").replace("/", "\\");
+                        File audioFile = new File(windowsPath);
+                        
+                        if (audioFile.exists()) {
+                            AudioFile af = AudioFileIO.read(audioFile);
+                            Tag tag = af.getTag();
+                            
+                            if (tag != null) {
+                                try {
+                                    Method getFirstArtworkMethod = tag.getClass().getMethod("getFirstArtwork");
+                                    Object artwork = getFirstArtworkMethod.invoke(tag);
+                                    
+                                    if (artwork != null) {
+                                        Method getBinaryDataMethod = artwork.getClass().getMethod("getBinaryData");
+                                        byte[] imageData = (byte[]) getBinaryDataMethod.invoke(artwork);
+                                        
+                                        ImageIcon icon = new ImageIcon(imageData);
+                                        Image scaledImg = icon.getImage().getScaledInstance(180, 180, Image.SCALE_SMOOTH);
+                                        
+                                        SwingUtilities.invokeLater(() -> {
+                                            albumArtLabel.setIcon(new ImageIcon(scaledImg));
+                                        });
+                                        return;
+                                    }
+                                } catch (Exception e) {
+                                }
+                                
+                                SwingUtilities.invokeLater(() -> {
+                                    albumArtLabel.setIcon(null);
+                                    albumArtLabel.setText("No Artwork");
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Could not load album art: " + e.getMessage());
+                SwingUtilities.invokeLater(() -> {
+                    albumArtLabel.setIcon(null);
+                    albumArtLabel.setText("No Artwork");
+                });
+            }
+        }).start();
+    }
+
+    private void togglePlayPause() {
+        if (currentSongTitle.isEmpty()) return;
+
+        if (isPlaying) {
+            AudioPlayer.pauseSong();
+            playPauseBtn.setText("▶");
+            isPlaying = false;
+        } else {
+            AudioPlayer.resumeSong();
+            playPauseBtn.setText("⏸");
+            isPlaying = true;
+        }
+    }
+
+    private void playPrevious() {
+        DefaultTableModel model = (DefaultTableModel) songTableView.getModel();
+        int currentIndex = songTableView.getSelectedRow();
+        
+        if (currentIndex > 0) {
+            String prevSong = (String) model.getValueAt(currentIndex - 1, 1);
+            playSong(prevSong, currentArtist, currentAlbum);
+        }
+    }
+
+    private void playNext() {
+        DefaultTableModel model = (DefaultTableModel) songTableView.getModel();
+        int currentIndex = songTableView.getSelectedRow();
+        
+        if (currentIndex < model.getRowCount() - 1) {
+            String nextSong = (String) model.getValueAt(currentIndex + 1, 1);
+            playSong(nextSong, currentArtist, currentAlbum);
+        }
+    }
+
+    private void playCurrentAgain() {
+        if (!currentSongTitle.isEmpty()) {
+            playSong(currentSongTitle, currentArtist, currentAlbum);
+        }
+    }
+
+    private void shufflePlay() {
+        DefaultTableModel model = (DefaultTableModel) songTableView.getModel();
+        if (model.getRowCount() > 1) {
+            Random rand = new Random();
+            int randomIndex = rand.nextInt(model.getRowCount());
+            String randomSong = (String) model.getValueAt(randomIndex, 1);
+            playSong(randomSong, currentArtist, currentAlbum);
+        }
     }
 
     private JButton createIconButton(String text, int size) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("SansSerif", Font.PLAIN, size));
-        btn.setForeground(Color.WHITE);
+        btn.setForeground(new Color(50, 205, 50)); // Lime green
         btn.setBackground(Color.BLACK);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
         btn.setContentAreaFilled(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setMargin(new Insets(0, 0, 0, 0));
+        btn.setMargin(new Insets(5, 5, 5, 5));
+        
+        btn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                btn.setForeground(Color.WHITE);
+            }
+            
+            @Override
+            public void mouseExited(MouseEvent e) {
+                btn.setForeground(new Color(50, 205, 50)); // Lime green
+            }
+        });
+        
         return btn;
+    }
+
+    private void styleSplitPane(JSplitPane splitPane) {
+        splitPane.setUI(new BasicSplitPaneUI() {
+            @Override
+            public BasicSplitPaneDivider createDefaultDivider() {
+                return new BasicSplitPaneDivider(this) {
+                    @Override
+                    public void paint(Graphics g) {
+                        g.setColor(new Color(40, 40, 40));
+                        g.fillRect(0, 0, getWidth(), getHeight());
+                        super.paint(g);
+                    }
+                };
+            }
+        });
     }
 }
