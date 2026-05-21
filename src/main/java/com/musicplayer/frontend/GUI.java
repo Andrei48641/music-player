@@ -16,7 +16,7 @@ public class GUI extends JFrame {
     private boolean isPlaying = false;
 
     public GUI() {
-        setTitle("My Clean Music Player");
+        setTitle("music player");
         setSize(400, 580);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         getContentPane().setBackground(Color.BLACK);
