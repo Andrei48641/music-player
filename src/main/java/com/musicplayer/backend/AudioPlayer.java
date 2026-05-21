@@ -79,7 +79,6 @@ public class AudioPlayer {
             try {
                 mp3Player.stop();
             } catch (Exception e) {
-                // Ignore
             }
             mp3Player = null;
         }
@@ -166,9 +165,6 @@ public class AudioPlayer {
         return songs.toArray(new String[0]);
     }
 
-    /**
-     * Get all artists from the database
-     */
     public static String[] getArtists() {
         ArrayList<String> artists = new ArrayList<>();
 
@@ -190,9 +186,6 @@ public class AudioPlayer {
         return artists.toArray(new String[0]);
     }
 
-    /**
-     * Get all albums for a specific artist
-     */
     public static String[] getAlbumsForArtist(String artistName) {
         ArrayList<String> albums = new ArrayList<>();
 
@@ -216,9 +209,7 @@ public class AudioPlayer {
         return albums.toArray(new String[0]);
     }
 
-    /**
-     * Get all songs for a specific album and artist
-     */
+   
     public static String[] getSongsForAlbum(String artistName, String albumTitle) {
         ArrayList<String> songs = new ArrayList<>();
 

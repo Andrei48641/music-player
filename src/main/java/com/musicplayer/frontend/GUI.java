@@ -39,7 +39,7 @@ public class GUI extends JFrame {
         getContentPane().setBackground(Color.BLACK);
         setLayout(new BorderLayout());
 
-        // Menu Bar
+        //menu Bar
         JMenuBar menuBar = new JMenuBar();
         menuBar.setBackground(Color.BLACK);
         menuBar.setForeground(Color.WHITE);
@@ -60,7 +60,7 @@ public class GUI extends JFrame {
         mainSplitPane.setDividerSize(8);
         styleSplitPane(mainSplitPane);
 
-        // LEFT PANEL - Library Tree
+        // LEFT PANEL artist with albums and songs tree
         JPanel leftPanel = createLibraryPanel();
         mainSplitPane.setLeftComponent(leftPanel);
 
