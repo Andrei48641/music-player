@@ -11,7 +11,7 @@ import java.sql.*;
 public class MusicScanner {
 
     public static void startScan() {
-        File root = new File("X:/10_MUSIC/Albums(320)/");
+        File root = new File("X:/10_MUSIC/ALBUMS/");
 
         if (!root.exists()) {
             System.err.println("ERROR root folder doesn't exist (check tailscale/database) " + root.getAbsolutePath());
