@@ -22,6 +22,7 @@ public class GUI extends JFrame {
     private JLabel titleLabel;
     private JLabel artistLabel;
     private JLabel albumLabel;
+    private JLabel yearLabel;
     private JButton playPauseBtn;
     private JTable songTableView;
     private JTree libraryTree;
@@ -89,38 +90,37 @@ public class GUI extends JFrame {
         for (String artist : artists) {
             DefaultMutableTreeNode artistNode = new DefaultMutableTreeNode(artist);
             String[] albums = AudioPlayer.getAlbumsForArtist(artist);
-            
+
             for (String album : albums) {
                 DefaultMutableTreeNode albumNode = new DefaultMutableTreeNode(album);
                 String[] songs = AudioPlayer.getSongsForAlbum(artist, album);
-                
+
                 for (String song : songs) {
                     albumNode.add(new DefaultMutableTreeNode(song));
                 }
-                
+
                 artistNode.add(albumNode);
             }
-            
+
             rootNode.add(artistNode);
         }
 
         libraryTree = new JTree(rootNode);
         libraryTree.setBackground(Color.BLACK);
-        libraryTree.setForeground(new Color(50, 205, 50)); // Lime green
+        libraryTree.setForeground(new Color(50, 205, 50));
         libraryTree.setOpaque(true);
         libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
             @Override
-            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, 
+            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel,
                     boolean expanded, boolean leaf, int row, boolean hasFocus) {
                 Component c = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
                 setBackground(sel ? new Color(100, 100, 150) : Color.BLACK);
-                setForeground(sel ? Color.WHITE : new Color(50, 205, 50)); // lime when not selected, white when selected
+                setForeground(sel ? Color.WHITE : new Color(50, 205, 50));
                 setOpaque(true);
                 return c;
             }
         });
 
-        // Add double-click listener for playing songs
         libraryTree.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -128,14 +128,13 @@ public class GUI extends JFrame {
                     TreePath path = libraryTree.getPathForLocation(e.getX(), e.getY());
                     if (path != null) {
                         DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
-                        
-                        // Check if it's a song (leaf node with 3-level parent hierarchy)
-                        if (node.isLeaf() && node.getParent() != null && 
+
+                        if (node.isLeaf() && node.getParent() != null &&
                             node.getParent().getParent() != null) {
                             String songTitle = node.toString();
                             DefaultMutableTreeNode albumNode = (DefaultMutableTreeNode) node.getParent();
                             DefaultMutableTreeNode artistNode = (DefaultMutableTreeNode) albumNode.getParent();
-                            
+
                             playSong(songTitle, artistNode.toString(), albumNode.toString());
                         }
                     }
@@ -146,10 +145,12 @@ public class GUI extends JFrame {
         JScrollPane treeScroll = new JScrollPane(libraryTree);
         treeScroll.setBackground(Color.BLACK);
         treeScroll.getViewport().setBackground(Color.BLACK);
+
         JLabel libraryLabel = new JLabel("  Library");
         libraryLabel.setBackground(Color.BLACK);
         libraryLabel.setForeground(new Color(50, 205, 50));
         libraryLabel.setOpaque(true);
+
         panel.add(libraryLabel, BorderLayout.NORTH);
         panel.add(treeScroll, BorderLayout.CENTER);
 
@@ -160,18 +161,18 @@ public class GUI extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.BLACK);
 
-        // Create table model with columns
-        String[] columnNames = {"#", "Title", "Artist"};
+        // ── Song table ──
+        String[] columnNames = {"#", "Title"};
         DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false; // Make cells non-editable
+                return false;
             }
         };
 
         songTableView = new JTable(tableModel);
         songTableView.setBackground(Color.BLACK);
-        songTableView.setForeground(new Color(50, 205, 50)); // Lime green
+        songTableView.setForeground(new Color(50, 205, 50));
         songTableView.setSelectionBackground(new Color(100, 100, 150));
         songTableView.setSelectionForeground(Color.WHITE);
         songTableView.setGridColor(new Color(50, 50, 50));
@@ -180,13 +181,10 @@ public class GUI extends JFrame {
         songTableView.getTableHeader().setBackground(Color.BLACK);
         songTableView.getTableHeader().setForeground(new Color(50, 205, 50));
         songTableView.getTableHeader().setOpaque(true);
-        
-        // Set column widths
-        songTableView.getColumnModel().getColumn(0).setPreferredWidth(40);  // Track #
-        songTableView.getColumnModel().getColumn(1).setPreferredWidth(300); // Title
-        songTableView.getColumnModel().getColumn(2).setPreferredWidth(150); // Artist
-        // songTableView.getColumnModel().getColumn(3).setPreferredWidth(80);  // Duration
 
+        songTableView.getColumnModel().getColumn(0).setPreferredWidth(40);
+        songTableView.getColumnModel().getColumn(1).setPreferredWidth(450);
+        
         songTableView.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -204,10 +202,10 @@ public class GUI extends JFrame {
         songScroll.setBackground(Color.BLACK);
         songScroll.getViewport().setBackground(Color.BLACK);
 
-        // Top part - Album Art + Info
-        JPanel topPanel = new JPanel(new BorderLayout());
-        topPanel.setBackground(Color.BLACK);
-        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        // ── LEFT side of top panel: Album Art ──
+        JPanel artPanel = new JPanel(new BorderLayout());
+        artPanel.setBackground(Color.BLACK);
+        artPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         albumArtLabel = new JLabel();
         albumArtLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -217,39 +215,66 @@ public class GUI extends JFrame {
         albumArtLabel.setOpaque(true);
         albumArtLabel.setBorder(BorderFactory.createLineBorder(new Color(50, 50, 50), 1));
 
+        artPanel.add(albumArtLabel, BorderLayout.CENTER);
+
+        // ── RIGHT side of top panel: Song info ──
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
         infoPanel.setBackground(Color.BLACK);
-        infoPanel.setBorder(BorderFactory.createEmptyBorder(0, 15, 0, 0));
+        infoPanel.setBorder(BorderFactory.createEmptyBorder(20, 15, 10, 10));
 
         titleLabel = new JLabel("Select a song");
         titleLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
         titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        artistLabel = new JLabel("");
-        artistLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        JSeparator sep = new JSeparator(SwingConstants.HORIZONTAL);
+        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        sep.setForeground(new Color(60, 60, 60));
+        sep.setBackground(new Color(60, 60, 60));
+        sep.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        artistLabel = new JLabel("Artist: —");
+        artistLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         artistLabel.setForeground(new Color(150, 150, 150));
+        artistLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        albumLabel = new JLabel("");
-        albumLabel.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        albumLabel = new JLabel("Album: —");
+        albumLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         albumLabel.setForeground(new Color(150, 150, 150));
+        albumLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        yearLabel = new JLabel("Year: —");
+        yearLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        yearLabel.setForeground(new Color(150, 150, 150));
+        yearLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         infoPanel.add(titleLabel);
-        infoPanel.add(Box.createRigidArea(new Dimension(0, 5)));
+        infoPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        infoPanel.add(sep);
+        infoPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         infoPanel.add(artistLabel);
+        infoPanel.add(Box.createRigidArea(new Dimension(0, 6)));
         infoPanel.add(albumLabel);
+        infoPanel.add(Box.createRigidArea(new Dimension(0, 6)));
+        infoPanel.add(yearLabel);
         infoPanel.add(Box.createVerticalGlue());
 
-        topPanel.add(albumArtLabel, BorderLayout.WEST);
-        topPanel.add(infoPanel, BorderLayout.CENTER);
+        // ── Horizontal split: art | info ──
+        JSplitPane topSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        topSplit.setDividerLocation(210);
+        topSplit.setDividerSize(6);
+        styleSplitPane(topSplit);
+        topSplit.setLeftComponent(artPanel);
+        topSplit.setRightComponent(infoPanel);
 
-        // Main split pane
+        // ── Vertical split: top info | song list ──
         JSplitPane mainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         mainSplit.setBackground(new Color(40, 40, 40));
         mainSplit.setDividerLocation(220);
         mainSplit.setDividerSize(8);
         styleSplitPane(mainSplit);
-        mainSplit.setTopComponent(topPanel);
+        mainSplit.setTopComponent(topSplit);
         mainSplit.setBottomComponent(songScroll);
 
         panel.add(mainSplit, BorderLayout.CENTER);
@@ -267,9 +292,9 @@ public class GUI extends JFrame {
         JPanel progressPanel = new JPanel(new BorderLayout());
         progressPanel.setBackground(Color.BLACK);
         JLabel timeStart = new JLabel("00:00");
-        timeStart.setForeground(new Color(50, 205, 50)); // Lime green
+        timeStart.setForeground(new Color(50, 205, 50));
         JLabel timeEnd = new JLabel("00:00");
-        timeEnd.setForeground(new Color(50, 205, 50)); // Lime green
+        timeEnd.setForeground(new Color(50, 205, 50));
         JSlider slider = new JSlider(0, 100, 0);
         slider.setBackground(Color.BLACK);
         slider.setForeground(new Color(100, 150, 200));
@@ -317,6 +342,22 @@ public class GUI extends JFrame {
         titleLabel.setText(songTitle);
         artistLabel.setText("Artist: " + artist);
         albumLabel.setText("Album: " + album);
+        yearLabel.setText("Year: —");
+
+        // Fetch year from metadata asynchronously
+        new Thread(() -> {
+            try {
+                Map<String, String> info = AudioPlayer.getSongInfo(songTitle);
+                // Try common tag key names for year
+                String year = info.getOrDefault("YEAR",
+                              info.getOrDefault("DATE",
+                              info.getOrDefault("ORIGINALYEAR", "")));
+                String displayYear = (year == null || year.isEmpty()) ? "—" : year;
+                SwingUtilities.invokeLater(() -> yearLabel.setText("Year: " + displayYear));
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> yearLabel.setText("Year: —"));
+            }
+        }).start();
 
         updateAlbumArt(artist, album);
 
@@ -325,18 +366,17 @@ public class GUI extends JFrame {
         isPlaying = true;
         playPauseBtn.setText("⏸");
 
-        // Update song list for current album
         updateSongList(artist, album, songTitle);
     }
 
     private void updateSongList(String artist, String album, String selectedSong) {
         String[] songs = AudioPlayer.getSongsForAlbum(artist, album);
         DefaultTableModel model = (DefaultTableModel) songTableView.getModel();
-        model.setRowCount(0); // Clear existing rows
+        model.setRowCount(0);
 
         int selectedRow = -1;
         for (int i = 0; i < songs.length; i++) {
-            model.addRow(new Object[]{i + 1, songs[i], artist, "N/A"});
+            model.addRow(new Object[]{i + 1, songs[i]});
             if (songs[i].equals(selectedSong)) {
                 selectedRow = i;
             }
@@ -355,35 +395,37 @@ public class GUI extends JFrame {
                 if (songs.length > 0) {
                     Map<String, String> songInfo = AudioPlayer.getSongInfo(songs[0]);
                     String filePath = songInfo.get("FILE_PATH");
-                    
+
                     if (filePath != null && !filePath.isEmpty()) {
                         String windowsPath = filePath.replace("/mnt/HDD1TB", "X:").replace("/", "\\");
                         File audioFile = new File(windowsPath);
-                        
+
                         if (audioFile.exists()) {
                             AudioFile af = AudioFileIO.read(audioFile);
                             Tag tag = af.getTag();
-                            
+
                             if (tag != null) {
                                 try {
                                     Method getFirstArtworkMethod = tag.getClass().getMethod("getFirstArtwork");
                                     Object artwork = getFirstArtworkMethod.invoke(tag);
-                                    
+
                                     if (artwork != null) {
                                         Method getBinaryDataMethod = artwork.getClass().getMethod("getBinaryData");
                                         byte[] imageData = (byte[]) getBinaryDataMethod.invoke(artwork);
-                                        
+
                                         ImageIcon icon = new ImageIcon(imageData);
                                         Image scaledImg = icon.getImage().getScaledInstance(180, 180, Image.SCALE_SMOOTH);
-                                        
+
                                         SwingUtilities.invokeLater(() -> {
                                             albumArtLabel.setIcon(new ImageIcon(scaledImg));
+                                            albumArtLabel.setText("");
                                         });
                                         return;
                                     }
                                 } catch (Exception e) {
+                                    // artwork reflection failed, fall through
                                 }
-                                
+
                                 SwingUtilities.invokeLater(() -> {
                                     albumArtLabel.setIcon(null);
                                     albumArtLabel.setText("No Artwork");
@@ -419,7 +461,7 @@ public class GUI extends JFrame {
     private void playPrevious() {
         DefaultTableModel model = (DefaultTableModel) songTableView.getModel();
         int currentIndex = songTableView.getSelectedRow();
-        
+
         if (currentIndex > 0) {
             String prevSong = (String) model.getValueAt(currentIndex - 1, 1);
             playSong(prevSong, currentArtist, currentAlbum);
@@ -429,7 +471,7 @@ public class GUI extends JFrame {
     private void playNext() {
         DefaultTableModel model = (DefaultTableModel) songTableView.getModel();
         int currentIndex = songTableView.getSelectedRow();
-        
+
         if (currentIndex < model.getRowCount() - 1) {
             String nextSong = (String) model.getValueAt(currentIndex + 1, 1);
             playSong(nextSong, currentArtist, currentAlbum);
@@ -455,26 +497,26 @@ public class GUI extends JFrame {
     private JButton createIconButton(String text, int size) {
         JButton btn = new JButton(text);
         btn.setFont(new Font("SansSerif", Font.PLAIN, size));
-        btn.setForeground(new Color(50, 205, 50)); // Lime green
+        btn.setForeground(new Color(50, 205, 50));
         btn.setBackground(Color.BLACK);
         btn.setBorderPainted(false);
         btn.setFocusPainted(false);
         btn.setContentAreaFilled(false);
         btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btn.setMargin(new Insets(5, 5, 5, 5));
-        
+
         btn.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
                 btn.setForeground(Color.WHITE);
             }
-            
+
             @Override
             public void mouseExited(MouseEvent e) {
-                btn.setForeground(new Color(50, 205, 50)); // Lime green
+                btn.setForeground(new Color(50, 205, 50));
             }
         });
-        
+
         return btn;
     }
 
