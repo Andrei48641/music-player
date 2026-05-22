@@ -1,7 +1,0 @@
-com\musicplayer\backend\DatabaseCleaner.class
-com\musicplayer\backend\AudioPlayer.class
-com\musicplayer\backend\MusicScanner.class
-com\musicplayer\backend\AudioPlayer$1.class
-com\musicplayer\App.class
-com\musicplayer\backend\DatabaseManager.class
-com\musicplayer\frontend\GUI.class
