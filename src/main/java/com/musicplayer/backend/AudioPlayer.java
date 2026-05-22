@@ -1,77 +1,99 @@
 package com.musicplayer.backend;
 
 import javazoom.jl.decoder.*;
+import javazoom.jl.player.advanced.PlaybackEvent;
+import javazoom.jl.player.advanced.PlaybackListener;
+
 import javax.sound.sampled.*;
 import javax.swing.SwingUtilities;
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.BufferedInputStream;
 import java.sql.*;
 import java.util.*;
 
 public class AudioPlayer {
 
-    private static Thread playerThread;
+    // replaced AdvancedPlayer with SourceDataLine
     private static SourceDataLine sourceLine;
-    private static volatile boolean stopRequested = false;
-    private static volatile boolean pauseRequested = false;
-    private static final Object pauseLock = new Object();
+    private static Thread playerThread;
 
     private static String currentPath = "";
-    private static volatile float currentVolume = 0.8f; // 0.0 to 1.0
+    private static int pausedFrame = 0;
+    private static boolean isPaused = false;
+
+    private static boolean manuallyStopped = false;
     private static Runnable onSongFinishedCallback;
+    
+    //  volume field
+    private static volatile float currentVolume = 0.8f;
 
     public static void setOnSongFinishedCallback(Runnable callback) {
         onSongFinishedCallback = callback;
     }
 
-    // Called from GUI with 0-100
+    //  called from GUI with 0-100
     public static void setVolume(int volume) {
         currentVolume = volume / 100f;
-        applyVolume();
-    }
-
-    private static void applyVolume() {
-        if (sourceLine != null && sourceLine.isOpen()) {
-            if (sourceLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-                FloatControl gain = (FloatControl) sourceLine.getControl(FloatControl.Type.MASTER_GAIN);
-                float dB = currentVolume == 0 ? gain.getMinimum()
-                         : (float)(Math.log10(currentVolume) * 20.0);
-                dB = Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), dB));
-                gain.setValue(dB);
-            }
+        // apply to live line if playing
+        if (sourceLine != null && sourceLine.isOpen()
+                && sourceLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+            FloatControl gain = (FloatControl) sourceLine.getControl(FloatControl.Type.MASTER_GAIN);
+            float dB = currentVolume == 0 ? gain.getMinimum()
+                     : (float)(Math.log10(currentVolume) * 20.0);
+            dB = Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), dB));
+            gain.setValue(dB);
         }
     }
 
+    // 
     public static void playSong(String songTitle) {
         stopSong();
+        pausedFrame = 0;
+        isPaused = false;
+        manuallyStopped = false;
+
         currentPath = getPathFromDB(songTitle);
         if (currentPath.isEmpty()) {
-            System.err.println("ERROR: song not found in database");
+            System.err.println("ERROR song not found in database");
             return;
         }
-        stopRequested = false;
-        pauseRequested = false;
-        startPlayerThread(true);
+
+        playFromFrame(pausedFrame);
     }
 
+    // 
     public static void pauseSong() {
-        pauseRequested = true;
+        if (!isPaused) {
+            isPaused = true;
+            manuallyStopped = true;
+            if (sourceLine != null) {
+                sourceLine.stop();
+            }
+            System.out.println("Paused at frame: " + pausedFrame);
+        }
     }
 
+    // 
     public static void resumeSong() {
-        if (pauseRequested) {
-            pauseRequested = false;
-            synchronized (pauseLock) {
-                pauseLock.notifyAll();
+        if (!currentPath.isEmpty()) {
+            if (isPaused) {
+                isPaused = false;
+                manuallyStopped = false;
+                playFromFrame(pausedFrame);
+            } else if (sourceLine == null) {
+                pausedFrame = 0;
+                manuallyStopped = false;
+                playFromFrame(0);
             }
         }
     }
 
+    // 
     public static void stopSong() {
-        stopRequested = true;
-        pauseRequested = false;
-        synchronized (pauseLock) {
-            pauseLock.notifyAll();
-        }
+        isPaused = false;
+        pausedFrame = 0;
+        manuallyStopped = true;
+
         if (sourceLine != null) {
             sourceLine.stop();
             sourceLine.flush();
@@ -80,12 +102,13 @@ public class AudioPlayer {
         }
         if (playerThread != null) {
             playerThread.interrupt();
-            try { playerThread.join(500); } catch (InterruptedException ignored) {}
             playerThread = null;
         }
+        System.out.println("Music stopped!");
     }
 
-    private static void startPlayerThread(boolean fromStart) {
+    //  Bitstream+Decoder+SourceDataLine instead of AdvancedPlayer
+    private static void playFromFrame(int startFrame) {
         playerThread = new Thread(() -> {
             try {
                 String windowsPath = currentPath.replace("/mnt/HDD1TB", "X:").replace("/", "\\");
@@ -95,28 +118,30 @@ public class AudioPlayer {
                 Bitstream bitstream = new Bitstream(bis);
                 Decoder decoder = new Decoder();
 
+                // skip to startFrame
+                for (int i = 0; i < startFrame; i++) {
+                    Header h = bitstream.readFrame();
+                    if (h == null) break;
+                    bitstream.closeFrame();
+                }
+
                 AudioFormat format = new AudioFormat(44100, 16, 2, true, false);
                 DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
                 sourceLine = (SourceDataLine) AudioSystem.getLine(info);
                 sourceLine.open(format);
                 sourceLine.start();
-                applyVolume(); // apply current volume immediately
 
+                // apply current volume immediately
+                setVolume((int)(currentVolume * 100));
+
+                int frameCount = startFrame;
                 Header header;
-                while (!stopRequested && (header = bitstream.readFrame()) != null) {
-                    // Handle pause
-                    synchronized (pauseLock) {
-                        while (pauseRequested && !stopRequested) {
-                            try { pauseLock.wait(); } catch (InterruptedException e) { break; }
-                        }
-                    }
-                    if (stopRequested) break;
-
+                while (!manuallyStopped && (header = bitstream.readFrame()) != null) {
                     SampleBuffer output = (SampleBuffer) decoder.decodeFrame(header, bitstream);
                     short[] samples = output.getBuffer();
                     int len = output.getBufferLength();
 
-                    // Apply software volume scaling as backup
+                    // software volume scaling as fallback
                     byte[] pcm = new byte[len * 2];
                     for (int i = 0; i < len; i++) {
                         short scaled = (short)(samples[i] * currentVolume);
@@ -126,25 +151,30 @@ public class AudioPlayer {
 
                     sourceLine.write(pcm, 0, pcm.length);
                     bitstream.closeFrame();
+                    frameCount++;
                 }
 
+                pausedFrame = frameCount;
                 sourceLine.drain();
                 sourceLine.close();
                 bitstream.close();
 
-                if (!stopRequested && onSongFinishedCallback != null) {
-                    SwingUtilities.invokeLater(onSongFinishedCallback);
+                if (!manuallyStopped) {
+                    pausedFrame = 0;
+                    isPaused = false;
+                    if (onSongFinishedCallback != null) {
+                        SwingUtilities.invokeLater(onSongFinishedCallback);
+                    }
                 }
 
             } catch (Exception e) {
-                System.err.println("Playback error: " + e.getMessage());
+                System.err.println("ERROR playing: " + e.getMessage());
             }
         });
         playerThread.start();
     }
 
-    // ── DB methods unchanged below ──
-
+    
     private static String getPathFromDB(String songTitle) {
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT FILE_PATH FROM SONGS WHERE TITLE = ?")) {
@@ -152,7 +182,7 @@ public class AudioPlayer {
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) return rs.getString("FILE_PATH");
         } catch (SQLException e) {
-            System.err.println("DB ERROR: " + e.getMessage());
+            System.err.println("database ERROR " + e.getMessage());
         }
         return "";
     }
@@ -160,8 +190,8 @@ public class AudioPlayer {
     public static String[] getPlaylist() {
         ArrayList<String> songs = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
-             Statement stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT TITLE FROM SONGS ORDER BY TITLE");
+             Statement statement = conn.createStatement()) {
+            ResultSet rs = statement.executeQuery("SELECT TITLE FROM SONGS ORDER BY TITLE");
             while (rs.next()) songs.add(rs.getString("TITLE"));
         } catch (SQLException e) {
             System.err.println("ERROR loading playlist: " + e.getMessage());
@@ -172,8 +202,8 @@ public class AudioPlayer {
     public static String[] getArtists() {
         ArrayList<String> artists = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
-             Statement stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT NAME FROM ARTISTS ORDER BY NAME");
+             Statement statement = conn.createStatement()) {
+            ResultSet rs = statement.executeQuery("SELECT NAME FROM ARTISTS ORDER BY NAME");
             while (rs.next()) artists.add(rs.getString("NAME"));
         } catch (SQLException e) {
             System.err.println("ERROR loading artists: " + e.getMessage());
