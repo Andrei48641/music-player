@@ -40,7 +40,7 @@ public class GUI extends JFrame {
         getContentPane().setBackground(Color.BLACK);
         setLayout(new BorderLayout());
 
-        //menu Bar
+        // Menu Bar
         JMenuBar menuBar = new JMenuBar();
         menuBar.setBackground(Color.BLACK);
         menuBar.setForeground(Color.WHITE);
@@ -61,7 +61,7 @@ public class GUI extends JFrame {
         mainSplitPane.setDividerSize(8);
         styleSplitPane(mainSplitPane);
 
-        // LEFT PANEL artist with albums and songs tree
+        // LEFT PANEL - Library Tree
         JPanel leftPanel = createLibraryPanel();
         mainSplitPane.setLeftComponent(leftPanel);
 
@@ -78,6 +78,18 @@ public class GUI extends JFrame {
         setLocationRelativeTo(null);
         setVisible(true);
     }
+
+    private Icon makeEmojiIcon(String emoji) {
+    return new Icon() {
+        public int getIconWidth()  { return 12; }  // was 18
+        public int getIconHeight() { return 18; }
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            g.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
+            g.setColor(new Color(50, 205, 50));
+            g.drawString(emoji, x, y + 14);
+        }
+    };
+}
 
     private JPanel createLibraryPanel() {
         JPanel panel = new JPanel(new BorderLayout());
@@ -106,20 +118,38 @@ public class GUI extends JFrame {
         }
 
         libraryTree = new JTree(rootNode);
-        libraryTree.setBackground(Color.BLACK);
-        libraryTree.setForeground(new Color(50, 205, 50));
-        libraryTree.setOpaque(true);
-        libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
-            @Override
-            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel,
-                    boolean expanded, boolean leaf, int row, boolean hasFocus) {
-                Component c = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
-                setBackground(sel ? new Color(100, 100, 150) : Color.BLACK);
-                setForeground(sel ? Color.WHITE : new Color(50, 205, 50));
-                setOpaque(true);
-                return c;
-            }
-        });
+libraryTree.setBackground(Color.BLACK);
+libraryTree.setForeground(new Color(50, 205, 50));
+libraryTree.setOpaque(true);
+libraryTree.setRowHeight(22);
+libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
+    @Override
+    public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel,
+            boolean expanded, boolean leaf, int row, boolean hasFocus) {
+        super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+        int depth = node.getLevel();
+
+        setBackground(sel ? new Color(100, 100, 150) : Color.BLACK);
+        setForeground(sel ? Color.WHITE : new Color(50, 205, 50));
+        setOpaque(true);
+        setIcon(null); // no separate icon, emoji is part of the text
+
+        String label = value.toString();
+        switch (depth) {
+            case 0: setText("🎧 " + label); break; // Library
+            case 1: setText("👤 " + label); break; // Artist
+            case 2: setText("🎵 " + label); break; // Album
+            case 3: setText("🎶 " + label); break; // Song
+            default: setText(label); break;
+        }
+
+        setFont(new Font("Segoe UI Emoji", Font.PLAIN, 13));
+
+        return this;
+    }
+});
 
         libraryTree.addMouseListener(new MouseAdapter() {
             @Override
@@ -161,7 +191,7 @@ public class GUI extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.BLACK);
 
-        // ── Song table ──
+        // Song table - only # and Title now
         String[] columnNames = {"#", "Title"};
         DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
@@ -184,7 +214,7 @@ public class GUI extends JFrame {
 
         songTableView.getColumnModel().getColumn(0).setPreferredWidth(40);
         songTableView.getColumnModel().getColumn(1).setPreferredWidth(450);
-        
+
         songTableView.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -202,7 +232,7 @@ public class GUI extends JFrame {
         songScroll.setBackground(Color.BLACK);
         songScroll.getViewport().setBackground(Color.BLACK);
 
-        // ── LEFT side of top panel: Album Art ──
+        // LEFT side of top panel: Album Art
         JPanel artPanel = new JPanel(new BorderLayout());
         artPanel.setBackground(Color.BLACK);
         artPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -217,7 +247,7 @@ public class GUI extends JFrame {
 
         artPanel.add(albumArtLabel, BorderLayout.CENTER);
 
-        // ── RIGHT side of top panel: Song info ──
+        // RIGHT side of top panel: Song info
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
         infoPanel.setBackground(Color.BLACK);
@@ -234,17 +264,17 @@ public class GUI extends JFrame {
         sep.setBackground(new Color(60, 60, 60));
         sep.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        artistLabel = new JLabel("Artist: —");
+        artistLabel = new JLabel("Artist: \u2014");
         artistLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         artistLabel.setForeground(new Color(150, 150, 150));
         artistLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        albumLabel = new JLabel("Album: —");
+        albumLabel = new JLabel("Album: \u2014");
         albumLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         albumLabel.setForeground(new Color(150, 150, 150));
         albumLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        yearLabel = new JLabel("Year: —");
+        yearLabel = new JLabel("Year: \u2014");
         yearLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         yearLabel.setForeground(new Color(150, 150, 150));
         yearLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -260,7 +290,7 @@ public class GUI extends JFrame {
         infoPanel.add(yearLabel);
         infoPanel.add(Box.createVerticalGlue());
 
-        // ── Horizontal split: art | info ──
+        // Horizontal split: art | info
         JSplitPane topSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         topSplit.setDividerLocation(210);
         topSplit.setDividerSize(6);
@@ -268,7 +298,7 @@ public class GUI extends JFrame {
         topSplit.setLeftComponent(artPanel);
         topSplit.setRightComponent(infoPanel);
 
-        // ── Vertical split: top info | song list ──
+        // Vertical split: top info | song list
         JSplitPane mainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         mainSplit.setBackground(new Color(40, 40, 40));
         mainSplit.setDividerLocation(220);
@@ -295,32 +325,42 @@ public class GUI extends JFrame {
         timeStart.setForeground(new Color(50, 205, 50));
         JLabel timeEnd = new JLabel("00:00");
         timeEnd.setForeground(new Color(50, 205, 50));
-        JSlider slider = new JSlider(0, 100, 0);
-        slider.setBackground(Color.BLACK);
-        slider.setForeground(new Color(100, 150, 200));
+        JSlider progressSlider = new JSlider(0, 100, 0);
+        progressSlider.setBackground(Color.BLACK);
+        progressSlider.setForeground(new Color(100, 150, 200));
         progressPanel.add(timeStart, BorderLayout.WEST);
-        progressPanel.add(slider, BorderLayout.CENTER);
+        progressPanel.add(progressSlider, BorderLayout.CENTER);
         progressPanel.add(timeEnd, BorderLayout.EAST);
         panel.add(progressPanel);
         panel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-        // Control buttons
+        // Row: [shuffle | prev | play | next | repeat] centered, [volume] right-aligned
+        JPanel buttonRow = new JPanel(new BorderLayout());
+        buttonRow.setBackground(Color.BLACK);
+
+        // Left spacer to balance the volume panel on the right
+        JPanel leftSpacer = new JPanel();
+        leftSpacer.setBackground(Color.BLACK);
+        leftSpacer.setPreferredSize(new Dimension(160, 1));
+        buttonRow.add(leftSpacer, BorderLayout.WEST);
+
+        // Center: playback buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
         buttonPanel.setBackground(Color.BLACK);
 
-        JButton prevBtn = createIconButton("⏮", 24);
+        JButton prevBtn = createIconButton("\u23EE", 24);
         prevBtn.addActionListener(e -> playPrevious());
 
-        playPauseBtn = createIconButton("▶", 32);
+        playPauseBtn = createIconButton("\u25B6", 32);
         playPauseBtn.addActionListener(e -> togglePlayPause());
 
-        JButton nextBtn = createIconButton("⏭", 24);
+        JButton nextBtn = createIconButton("\u23ED", 24);
         nextBtn.addActionListener(e -> playNext());
 
-        JButton repeatBtn = createIconButton("🔁", 20);
+        JButton repeatBtn = createIconButton("\uD83D\uDD01", 20);
         repeatBtn.addActionListener(e -> playCurrentAgain());
 
-        JButton shuffleBtn = createIconButton("🔀", 20);
+        JButton shuffleBtn = createIconButton("\uD83D\uDD00", 20);
         shuffleBtn.addActionListener(e -> shufflePlay());
 
         buttonPanel.add(shuffleBtn);
@@ -328,8 +368,75 @@ public class GUI extends JFrame {
         buttonPanel.add(playPauseBtn);
         buttonPanel.add(nextBtn);
         buttonPanel.add(repeatBtn);
+        buttonRow.add(buttonPanel, BorderLayout.CENTER);
 
-        panel.add(buttonPanel);
+        // Right: volume icon + slider
+        JPanel volumePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        volumePanel.setBackground(Color.BLACK);
+        volumePanel.setPreferredSize(new Dimension(160, 1));
+
+        JLabel volIcon = new JLabel("\uD83D\uDD0A"); // 🔊
+        volIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
+        volIcon.setForeground(new Color(50, 205, 50));
+
+        JSlider volumeSlider = new JSlider(0, 100, 80);
+        volumeSlider.setPreferredSize(new Dimension(100, 20));
+        volumeSlider.setBackground(Color.BLACK);
+        volumeSlider.setForeground(new Color(50, 205, 50));
+        volumeSlider.setUI(new javax.swing.plaf.basic.BasicSliderUI(volumeSlider) {
+    @Override
+    public void paintTrack(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int trackY = trackRect.y + trackRect.height / 2;
+        // Dark background track
+        g2.setColor(new Color(50, 50, 50));
+        g2.fillRoundRect(trackRect.x, trackY - 2, trackRect.width, 4, 4, 4);
+        // Green filled portion (left of thumb)
+        int filledWidth = thumbRect.x + thumbRect.width / 2 - trackRect.x;
+        g2.setColor(new Color(50, 205, 50));
+        g2.fillRoundRect(trackRect.x, trackY - 2, filledWidth, 4, 4, 4);
+    }
+    @Override
+    public void paintThumb(Graphics g) {
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // Small green circle, no border
+        int cx = thumbRect.x + thumbRect.width / 2;
+        int cy = thumbRect.y + thumbRect.height / 2;
+        int r = 5;
+        g2.setColor(new Color(50, 205, 50));
+        g2.fillOval(cx - r, cy - r, r * 2, r * 2);
+    }
+    @Override
+    public void paintFocus(Graphics g) {} // removes dotted border
+});
+volumeSlider.setBorder(BorderFactory.createEmptyBorder()); // removes white outline
+volumeSlider.setOpaque(false);
+
+        // Set initial volume
+        AudioPlayer.setVolume(volumeSlider.getValue());
+
+        volumeSlider.addChangeListener(e -> {
+            AudioPlayer.setVolume(volumeSlider.getValue());
+            // Update icon based on level
+            int val = volumeSlider.getValue();
+            if (val == 0) {
+                volIcon.setText("\uD83D\uDD07"); // 🔇
+            } else if (val < 40) {
+                volIcon.setText("\uD83D\uDD08"); // 🔈
+            } else if (val < 70) {
+                volIcon.setText("\uD83D\uDD09"); // 🔉
+            } else {
+                volIcon.setText("\uD83D\uDD0A"); // 🔊
+            }
+        });
+
+        volumePanel.add(volIcon);
+        volumePanel.add(volumeSlider);
+        buttonRow.add(volumePanel, BorderLayout.EAST);
+
+        panel.add(buttonRow);
 
         return panel;
     }
@@ -342,20 +449,19 @@ public class GUI extends JFrame {
         titleLabel.setText(songTitle);
         artistLabel.setText("Artist: " + artist);
         albumLabel.setText("Album: " + album);
-        yearLabel.setText("Year: —");
+        yearLabel.setText("Year: \u2014");
 
         // Fetch year from metadata asynchronously
         new Thread(() -> {
             try {
                 Map<String, String> info = AudioPlayer.getSongInfo(songTitle);
-                // Try common tag key names for year
                 String year = info.getOrDefault("YEAR",
                               info.getOrDefault("DATE",
                               info.getOrDefault("ORIGINALYEAR", "")));
-                String displayYear = (year == null || year.isEmpty()) ? "—" : year;
+                String displayYear = (year == null || year.isEmpty()) ? "\u2014" : year;
                 SwingUtilities.invokeLater(() -> yearLabel.setText("Year: " + displayYear));
             } catch (Exception e) {
-                SwingUtilities.invokeLater(() -> yearLabel.setText("Year: —"));
+                SwingUtilities.invokeLater(() -> yearLabel.setText("Year: \u2014"));
             }
         }).start();
 
@@ -364,7 +470,7 @@ public class GUI extends JFrame {
         new Thread(() -> AudioPlayer.playSong(songTitle)).start();
 
         isPlaying = true;
-        playPauseBtn.setText("⏸");
+        playPauseBtn.setText("\u23F8");
 
         updateSongList(artist, album, songTitle);
     }
@@ -449,11 +555,11 @@ public class GUI extends JFrame {
 
         if (isPlaying) {
             AudioPlayer.pauseSong();
-            playPauseBtn.setText("▶");
+            playPauseBtn.setText("\u25B6");
             isPlaying = false;
         } else {
             AudioPlayer.resumeSong();
-            playPauseBtn.setText("⏸");
+            playPauseBtn.setText("\u23F8");
             isPlaying = true;
         }
     }
