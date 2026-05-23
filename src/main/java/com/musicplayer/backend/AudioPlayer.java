@@ -15,7 +15,6 @@ import org.jaudiotagger.audio.AudioFileIO;
 
 public class AudioPlayer {
 
-    // replaced AdvancedPlayer with SourceDataLine
     private static SourceDataLine sourceLine;
     private static Thread playerThread;
 
@@ -25,7 +24,7 @@ public class AudioPlayer {
 
     private static boolean manuallyStopped = false;
     private static Runnable onSongFinishedCallback;
-    
+
     //  volume field
     private static volatile float currentVolume = 0.8f;
 
@@ -72,7 +71,7 @@ public class AudioPlayer {
         playFromFrame(targetFrame);
     }
 
-    // 
+    //
     public static void playSong(String songTitle) {
         stopSong();
         pausedFrame = 0;
@@ -98,7 +97,7 @@ public class AudioPlayer {
         playFromFrame(pausedFrame);
     }
 
-    // 
+    //
     public static void pauseSong() {
         if (!isPaused) {
             isPaused = true;
@@ -110,7 +109,7 @@ public class AudioPlayer {
         }
     }
 
-    // 
+    //
     public static void resumeSong() {
         if (!currentPath.isEmpty()) {
             if (isPaused) {
@@ -125,7 +124,7 @@ public class AudioPlayer {
         }
     }
 
-    // 
+    //
     public static void stopSong() {
         isPaused = false;
         pausedFrame = 0;
@@ -144,7 +143,7 @@ public class AudioPlayer {
         System.out.println("Music stopped!");
     }
 
-    //  Bitstream+Decoder+SourceDataLine instead of AdvancedPlayer
+    //  Bitstream+Decoder+SourceDataLine 
     private static void playFromFrame(int startFrame) {
         playerThread = new Thread(() -> {
             try {
@@ -211,7 +210,6 @@ public class AudioPlayer {
         playerThread.start();
     }
 
-    
     private static String getPathFromDB(String songTitle) {
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement("SELECT FILE_PATH FROM SONGS WHERE TITLE = ?")) {
@@ -303,5 +301,91 @@ public class AudioPlayer {
             System.err.println("ERROR loading song info: " + e.getMessage());
         }
         return info;
+    }
+
+    // ── Playlist methods ──
+
+    public static void createPlaylist(String name) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "INSERT INTO PLAYLISTS (NAME) VALUES (?)")) {
+            stmt.setString(1, name);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("ERROR creating playlist: " + e.getMessage());
+        }
+    }
+
+    public static void deletePlaylist(int playlistId) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "DELETE FROM PLAYLISTS WHERE ID = ?")) {
+            stmt.setInt(1, playlistId);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("ERROR deleting playlist: " + e.getMessage());
+        }
+    }
+
+    public static Map<Integer, String> getPlaylists() {
+        Map<Integer, String> playlists = new LinkedHashMap<>();
+        try (Connection conn = DatabaseManager.getConnection();
+             Statement stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery("SELECT ID, NAME FROM PLAYLISTS ORDER BY NAME");
+            while (rs.next()) {
+                playlists.put(rs.getInt("ID"), rs.getString("NAME"));
+            }
+        } catch (SQLException e) {
+            System.err.println("ERROR loading playlists: " + e.getMessage());
+        }
+        return playlists;
+    }
+
+    public static void addSongToPlaylist(int playlistId, String songTitle) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement getSong = conn.prepareStatement(
+                "SELECT ID FROM SONGS WHERE TITLE = ?")) {
+            getSong.setString(1, songTitle);
+            ResultSet rs = getSong.executeQuery();
+            if (rs.next()) {
+                int songId = rs.getInt("ID");
+                PreparedStatement insert = conn.prepareStatement(
+                    "INSERT INTO PLAYLIST_SONGS (PLAYLIST_ID, SONG_ID) VALUES (?, ?)");
+                insert.setInt(1, playlistId);
+                insert.setInt(2, songId);
+                insert.executeUpdate();
+            }
+        } catch (SQLException e) {
+            System.err.println("ERROR adding song to playlist: " + e.getMessage());
+        }
+    }
+
+    public static String[] getSongsForPlaylist(int playlistId) {
+        ArrayList<String> songs = new ArrayList<>();
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "SELECT S.TITLE FROM SONGS S " +
+                "JOIN PLAYLIST_SONGS PS ON S.ID = PS.SONG_ID " +
+                "WHERE PS.PLAYLIST_ID = ?")) {
+            stmt.setInt(1, playlistId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) songs.add(rs.getString("TITLE"));
+        } catch (SQLException e) {
+            System.err.println("ERROR loading playlist songs: " + e.getMessage());
+        }
+        return songs.toArray(new String[0]);
+    }
+
+    public static void removeSongFromPlaylist(int playlistId, String songTitle) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "DELETE FROM PLAYLIST_SONGS WHERE PLAYLIST_ID = ? AND SONG_ID = " +
+                "(SELECT ID FROM SONGS WHERE TITLE = ?)")) {
+            stmt.setInt(1, playlistId);
+            stmt.setString(2, songTitle);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("ERROR removing song from playlist: " + e.getMessage());
+        }
     }
 }

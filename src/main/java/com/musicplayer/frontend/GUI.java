@@ -12,6 +12,7 @@ import java.io.File;
 import java.util.*;
 import java.lang.reflect.Method;
 import com.musicplayer.backend.AudioPlayer;
+import com.musicplayer.backend.DatabaseManager;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
@@ -27,13 +28,15 @@ public class GUI extends JFrame {
     private JTable songTableView;
     private JTree libraryTree;
     private DefaultMutableTreeNode rootNode;
+    private DefaultMutableTreeNode playlistsRootNode;
+    private DefaultMutableTreeNode libraryNode;
 
     private String currentSongTitle = "";
     private String currentArtist = "";
     private String currentAlbum = "";
     private boolean isPlaying = false;
 
-    // progress slider var
+    // progress slider fields
     private JSlider progressSlider;
     private JLabel timeStart;
     private JLabel timeEnd;
@@ -41,6 +44,9 @@ public class GUI extends JFrame {
     private boolean seeking = false;
 
     public GUI() {
+        // init playlist tables on startup
+        DatabaseManager.initPlaylistTables();
+
         setTitle("bbbrfbnbbb");
         setSize(1200, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -59,121 +65,263 @@ public class GUI extends JFrame {
         fileMenu.add(exitItem);
         menuBar.add(fileMenu);
 
+        // Playlists menu
+        JMenu playlistMenu = new JMenu("Playlists");
+        playlistMenu.setForeground(Color.WHITE);
+        JMenuItem newPlaylistItem = new JMenuItem("New Playlist...");
+        newPlaylistItem.addActionListener(e -> createNewPlaylist());
+        playlistMenu.add(newPlaylistItem);
+        menuBar.add(playlistMenu);
+
         setJMenuBar(menuBar);
 
-        // Cmain content panel with split pane
+        // Create main content panel with split pane
         JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         mainSplitPane.setBackground(new Color(40, 40, 40));
         mainSplitPane.setDividerLocation(300);
         mainSplitPane.setDividerSize(8);
         styleSplitPane(mainSplitPane);
 
-        // left - Library Tree
+        // left panel Library Tree
         JPanel leftPanel = createLibraryPanel();
         mainSplitPane.setLeftComponent(leftPanel);
 
-        // right pannel song list pannel art
+        // right panel song list album art
         JPanel rightPanel = createSongPanel();
         mainSplitPane.setRightComponent(rightPanel);
 
         add(mainSplitPane, BorderLayout.CENTER);
 
-        // bottom pannel control
+        // bottom panel controls
         JPanel bottomPanel = createControlsPanel();
         add(bottomPanel, BorderLayout.SOUTH);
 
         setLocationRelativeTo(null);
         setVisible(true);
+
+        // expand and load after window is visible
+        SwingUtilities.invokeLater(() -> {
+            refreshPlaylistsInTree();
+            libraryTree.expandPath(new TreePath(new Object[]{rootNode, libraryNode}));
+        });
     }
 
     private Icon makeEmojiIcon(String emoji) {
-    return new Icon() {
-        public int getIconWidth()  { return 12; }  
-        public int getIconHeight() { return 18; }
-        public void paintIcon(Component c, Graphics g, int x, int y) {
-            g.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
-            g.setColor(new Color(50, 205, 50));
-            g.drawString(emoji, x, y + 14);
+        return new Icon() {
+            public int getIconWidth()  { return 12; }
+            public int getIconHeight() { return 18; }
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                g.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
+                g.setColor(new Color(50, 205, 50));
+                g.drawString(emoji, x, y + 14);
+            }
+        };
+    }
+
+    private void createNewPlaylist() {
+        String name = JOptionPane.showInputDialog(this, "Playlist name:", "New Playlist", JOptionPane.PLAIN_MESSAGE);
+        if (name != null && !name.trim().isEmpty()) {
+            AudioPlayer.createPlaylist(name.trim());
+            refreshPlaylistsInTree();
         }
-    };
-}
+    }
+
+    private void refreshPlaylistsInTree() {
+        playlistsRootNode.removeAllChildren();
+        Map<Integer, String> playlists = AudioPlayer.getPlaylists();
+        for (Map.Entry<Integer, String> entry : playlists.entrySet()) {
+            DefaultMutableTreeNode plNode = new DefaultMutableTreeNode(
+                new PlaylistNode(entry.getKey(), entry.getValue()));
+            String[] songs = AudioPlayer.getSongsForPlaylist(entry.getKey());
+            for (String song : songs) {
+                plNode.add(new DefaultMutableTreeNode(new PlaylistSongNode(entry.getKey(), song)));
+            }
+            playlistsRootNode.add(plNode);
+        }
+        DefaultTreeModel model = (DefaultTreeModel) libraryTree.getModel();
+        model.reload();
+        // re-expand playlists root
+        libraryTree.expandPath(new TreePath(new Object[]{rootNode, playlistsRootNode}));
+    }
+
+    // helper classes to hold playlist data in tree nodes
+    private static class PlaylistNode {
+        int id; String name;
+        PlaylistNode(int id, String name) { this.id = id; this.name = name; }
+        @Override public String toString() { return name; }
+    }
+
+    private static class PlaylistSongNode {
+        int playlistId; String songTitle;
+        PlaylistSongNode(int playlistId, String songTitle) { this.playlistId = playlistId; this.songTitle = songTitle; }
+        @Override public String toString() { return songTitle; }
+    }
 
     private JPanel createLibraryPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.BLACK);
 
-        // library tree
-        rootNode = new DefaultMutableTreeNode("Library");
-        String[] artists = AudioPlayer.getArtists();
+        // root node
+        rootNode = new DefaultMutableTreeNode("ROOT");
 
+        // library branch
+        libraryNode = new DefaultMutableTreeNode("Library");
+        String[] artists = AudioPlayer.getArtists();
         for (String artist : artists) {
             DefaultMutableTreeNode artistNode = new DefaultMutableTreeNode(artist);
             String[] albums = AudioPlayer.getAlbumsForArtist(artist);
-
             for (String album : albums) {
                 DefaultMutableTreeNode albumNode = new DefaultMutableTreeNode(album);
                 String[] songs = AudioPlayer.getSongsForAlbum(artist, album);
-
                 for (String song : songs) {
                     albumNode.add(new DefaultMutableTreeNode(song));
                 }
-
                 artistNode.add(albumNode);
             }
-
-            rootNode.add(artistNode);
+            libraryNode.add(artistNode);
         }
+        rootNode.add(libraryNode);
+
+        // playlists branch — songs loaded later in refreshPlaylistsInTree()
+        playlistsRootNode = new DefaultMutableTreeNode("Playlists");
+        rootNode.add(playlistsRootNode);
 
         libraryTree = new JTree(rootNode);
-libraryTree.setBackground(Color.BLACK);
-libraryTree.setForeground(new Color(50, 205, 50));
-libraryTree.setOpaque(true);
-libraryTree.setRowHeight(22);
-libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
-    @Override
-    public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel,
-            boolean expanded, boolean leaf, int row, boolean hasFocus) {
-        super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+        libraryTree.setRootVisible(false);
+        libraryTree.setShowsRootHandles(true);
+        libraryTree.setBackground(Color.BLACK);
+        libraryTree.setForeground(new Color(50, 205, 50));
+        libraryTree.setOpaque(true);
+        libraryTree.setRowHeight(22);
+        libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
+            @Override
+            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel,
+                    boolean expanded, boolean leaf, int row, boolean hasFocus) {
+                super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
 
-        DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
-        int depth = node.getLevel();
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
+                Object userObj = node.getUserObject();
 
-        setBackground(sel ? new Color(100, 100, 150) : Color.BLACK);
-        setForeground(sel ? Color.WHITE : new Color(50, 205, 50));
-        setOpaque(true);
-        setIcon(null); // no separate icon, emoji is part of the text
+                setBackground(sel ? new Color(100, 100, 150) : Color.BLACK);
+                setForeground(sel ? Color.WHITE : new Color(50, 205, 50));
+                setOpaque(true);
+                setIcon(null);
 
-        String label = value.toString();
-        switch (depth) {
-            case 0: setText("🎧 " + label); break; // Library
-            case 1: setText("👤 " + label); break; // Artist
-            case 2: setText("🎵 " + label); break; // Album
-            case 3: setText("🎶 " + label); break; // Song
-            default: setText(label); break;
-        }
+                if (userObj instanceof PlaylistNode) {
+                    setText("📋 " + userObj.toString());
+                } else if (userObj instanceof PlaylistSongNode) {
+                    setText("🎶 " + userObj.toString());
+                } else {
+                    String label = userObj.toString();
+                    int depth = node.getLevel();
+                    switch (depth) {
+                        case 1: setText("🎧 " + label); break; // Library / Playlists
+                        case 2: setText("👤 " + label); break; // Artist
+                        case 3: setText("🎵 " + label); break; // Album
+                        case 4: setText("🎶 " + label); break; // Song
+                        default: setText(label); break;
+                    }
+                }
 
-        setFont(new Font("Segoe UI Emoji", Font.PLAIN, 13));
-
-        return this;
-    }
-});
+                setFont(new Font("Segoe UI Emoji", Font.PLAIN, 13));
+                return this;
+            }
+        });
 
         libraryTree.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
+                TreePath path = libraryTree.getPathForLocation(e.getX(), e.getY());
+                if (path == null) return;
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                Object userObj = node.getUserObject();
+
                 if (e.getClickCount() == 2) {
-                    TreePath path = libraryTree.getPathForLocation(e.getX(), e.getY());
-                    if (path != null) {
-                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                    // playlist song
+                    if (userObj instanceof PlaylistSongNode) {
+                        PlaylistSongNode psn = (PlaylistSongNode) userObj;
+                        Map<String, String> info = AudioPlayer.getSongInfo(psn.songTitle);
+                        String artist = info.getOrDefault("ARTIST", "");
+                        String album = info.getOrDefault("ALBUM", "");
+                        playSong(psn.songTitle, artist, album);
+                        return;
+                    }
+                    // library song depth 4 leaf
+                    if (node.isLeaf() && node.getLevel() == 4) {
+                        String songTitle = userObj.toString();
+                        DefaultMutableTreeNode albumNode = (DefaultMutableTreeNode) node.getParent();
+                        DefaultMutableTreeNode artistNode = (DefaultMutableTreeNode) albumNode.getParent();
+                        playSong(songTitle, artistNode.toString(), albumNode.toString());
+                    }
+                }
 
-                        if (node.isLeaf() && node.getParent() != null &&
-                            node.getParent().getParent() != null) {
-                            String songTitle = node.toString();
-                            DefaultMutableTreeNode albumNode = (DefaultMutableTreeNode) node.getParent();
-                            DefaultMutableTreeNode artistNode = (DefaultMutableTreeNode) albumNode.getParent();
+                // context menu
+                if (e.getButton() == MouseEvent.BUTTON3) {
 
-                            playSong(songTitle, artistNode.toString(), albumNode.toString());
+                    if (userObj instanceof PlaylistSongNode) {
+                        PlaylistSongNode psn = (PlaylistSongNode) userObj;
+                        JPopupMenu menu = new JPopupMenu();
+                        menu.setBackground(new Color(30, 30, 30));
+                        JMenuItem removeItem = new JMenuItem("Remove from playlist");
+                        removeItem.setForeground(new Color(50, 205, 50));
+                        removeItem.setBackground(new Color(30, 30, 30));
+                        removeItem.addActionListener(ev -> {
+                            AudioPlayer.removeSongFromPlaylist(psn.playlistId, psn.songTitle);
+                            refreshPlaylistsInTree();
+                        });
+                        menu.add(removeItem);
+                        menu.show(libraryTree, e.getX(), e.getY());
+                        return;
+                    }
+
+                    if (node.isLeaf() && node.getLevel() == 4) {
+                        final String finalSong = userObj.toString();
+                        Map<Integer, String> pls = AudioPlayer.getPlaylists();
+                        JPopupMenu menu = new JPopupMenu();
+                        menu.setBackground(new Color(30, 30, 30));
+                        if (pls.isEmpty()) {
+                            JMenuItem noPlaylists = new JMenuItem("No playlists — create one first");
+                            noPlaylists.setForeground(new Color(150, 150, 150));
+                            noPlaylists.setBackground(new Color(30, 30, 30));
+                            noPlaylists.setEnabled(false);
+                            menu.add(noPlaylists);
+                        } else {
+                            JMenu addToMenu = new JMenu("Add to playlist");
+                            addToMenu.setForeground(new Color(50, 205, 50));
+                            addToMenu.setBackground(new Color(30, 30, 30));
+                            for (Map.Entry<Integer, String> pl : pls.entrySet()) {
+                                JMenuItem item = new JMenuItem(pl.getValue());
+                                item.setForeground(new Color(50, 205, 50));
+                                item.setBackground(new Color(30, 30, 30));
+                                item.addActionListener(ev -> {
+                                    AudioPlayer.addSongToPlaylist(pl.getKey(), finalSong);
+                                    refreshPlaylistsInTree();
+                                });
+                                addToMenu.add(item);
+                            }
+                            menu.add(addToMenu);
                         }
+                        menu.show(libraryTree, e.getX(), e.getY());
+                    }
+
+                    // right click to delete playlist
+                    if (userObj instanceof PlaylistNode) {
+                        PlaylistNode pn = (PlaylistNode) userObj;
+                        JPopupMenu menu = new JPopupMenu();
+                        menu.setBackground(new Color(30, 30, 30));
+                        JMenuItem deleteItem = new JMenuItem("Delete playlist");
+                        deleteItem.setForeground(new Color(220, 80, 80));
+                        deleteItem.setBackground(new Color(30, 30, 30));
+                        deleteItem.addActionListener(ev -> {
+                            int confirm = JOptionPane.showConfirmDialog(GUI.this,
+                                "Delete playlist \"" + pn.name + "\"?", "Confirm", JOptionPane.YES_NO_OPTION);
+                            if (confirm == JOptionPane.YES_OPTION) {
+                                AudioPlayer.deletePlaylist(pn.id);
+                                refreshPlaylistsInTree();
+                            }
+                        });
+                        menu.add(deleteItem);
+                        menu.show(libraryTree, e.getX(), e.getY());
                     }
                 }
             }
@@ -195,11 +343,11 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         return panel;
     }
 
-    private JPanel createSongPanel() 
+    private JPanel createSongPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.BLACK);
 
-        // song pannel nr and title
+        // song table nr and title
         String[] columnNames = {"#", "Title"};
         DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
@@ -241,7 +389,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         songScroll.getViewport().setBackground(Color.BLACK);
         styleScrollBar(songScroll);
 
-        // left side of top pannel artwork
+        // left side panel album art
         JPanel artPanel = new JPanel(new BorderLayout());
         artPanel.setBackground(Color.BLACK);
         artPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -256,7 +404,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
 
         artPanel.add(albumArtLabel, BorderLayout.CENTER);
 
-        // song info right side
+        // right side panel song info
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
         infoPanel.setBackground(Color.BLACK);
@@ -299,7 +447,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         infoPanel.add(yearLabel);
         infoPanel.add(Box.createVerticalGlue());
 
-        // horizontal split art|info
+        // horizontal split art / info
         JSplitPane topSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         topSplit.setDividerLocation(210);
         topSplit.setDividerSize(6);
@@ -307,7 +455,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         topSplit.setLeftComponent(artPanel);
         topSplit.setRightComponent(infoPanel);
 
-        // vertical split: top info | song list
+        // vertical split
         JSplitPane mainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         mainSplit.setBackground(new Color(40, 40, 40));
         mainSplit.setDividerLocation(220);
@@ -327,7 +475,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         panel.setBackground(Color.BLACK);
         panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
-        // progress bar
+        // Progress bar
         JPanel progressPanel = new JPanel(new BorderLayout());
         progressPanel.setBackground(Color.BLACK);
 
@@ -366,25 +514,24 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         progressSlider.setOpaque(false);
 
         progressSlider.addMouseListener(new MouseAdapter() {
-    @Override
-    public void mousePressed(MouseEvent e) {
-        seeking = true;
-        // jump  to clicked position
-        int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
-        progressSlider.setValue(value);
-    }
-    @Override
-    public void mouseReleased(MouseEvent e) {
-        seeking = false;
-        int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
-        progressSlider.setValue(value);
-        int total = AudioPlayer.getTotalSeconds();
-        if (total > 0) {
-            int target = (int)(value / 1000.0 * total);
-            new Thread(() -> AudioPlayer.seekTo(target)).start();
-        }
-    }
-});
+            @Override
+            public void mousePressed(MouseEvent e) {
+                seeking = true;
+                int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
+                progressSlider.setValue(value);
+            }
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                seeking = false;
+                int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
+                progressSlider.setValue(value);
+                int total = AudioPlayer.getTotalSeconds();
+                if (total > 0) {
+                    int target = (int)(value / 1000.0 * total);
+                    new Thread(() -> AudioPlayer.seekTo(target)).start();
+                }
+            }
+        });
 
         progressPanel.add(timeStart, BorderLayout.WEST);
         progressPanel.add(progressSlider, BorderLayout.CENTER);
@@ -392,17 +539,17 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         panel.add(progressPanel);
         panel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-        // shuffle  prev  play  next  repeat centered volume
+        // shuffle prev play next repeat centered volume
         JPanel buttonRow = new JPanel(new BorderLayout());
         buttonRow.setBackground(Color.BLACK);
 
-        // left spacer to balance volume slider
+        // left spacer to balance the volume panel on the right
         JPanel leftSpacer = new JPanel();
         leftSpacer.setBackground(Color.BLACK);
         leftSpacer.setPreferredSize(new Dimension(160, 1));
         buttonRow.add(leftSpacer, BorderLayout.WEST);
 
-        //  playback buttons
+        // center buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
         buttonPanel.setBackground(Color.BLACK);
 
@@ -428,7 +575,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         buttonPanel.add(repeatBtn);
         buttonRow.add(buttonPanel, BorderLayout.CENTER);
 
-        //  volume icon + slider
+        // volume slider
         JPanel volumePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         volumePanel.setBackground(Color.BLACK);
         volumePanel.setPreferredSize(new Dimension(160, 1));
@@ -442,42 +589,41 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         volumeSlider.setBackground(Color.BLACK);
         volumeSlider.setForeground(new Color(50, 205, 50));
         volumeSlider.setUI(new javax.swing.plaf.basic.BasicSliderUI(volumeSlider) {
-    @Override
-    public void paintTrack(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        int trackY = trackRect.y + trackRect.height / 2;
-        // Dark background track
-        g2.setColor(new Color(50, 50, 50));
-        g2.fillRoundRect(trackRect.x, trackY - 2, trackRect.width, 4, 4, 4);
-        // color design
-        int filledWidth = thumbRect.x + thumbRect.width / 2 - trackRect.x;
-        g2.setColor(new Color(50, 205, 50));
-        g2.fillRoundRect(trackRect.x, trackY - 2, filledWidth, 4, 4, 4);
-    }
-    @Override
-    public void paintThumb(Graphics g) {
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        // green circle
-        int cx = thumbRect.x + thumbRect.width / 2;
-        int cy = thumbRect.y + thumbRect.height / 2;
-        int r = 5;
-        g2.setColor(new Color(50, 205, 50));
-        g2.fillOval(cx - r, cy - r, r * 2, r * 2);
-    }
-    @Override
-    public void paintFocus(Graphics g) {} // removes dotted border
-});
-volumeSlider.setBorder(BorderFactory.createEmptyBorder()); // removes white outline
-volumeSlider.setOpaque(false);
+            @Override
+            public void paintTrack(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int trackY = trackRect.y + trackRect.height / 2;
+                // Dark background track
+                g2.setColor(new Color(50, 50, 50));
+                g2.fillRoundRect(trackRect.x, trackY - 2, trackRect.width, 4, 4, 4);
+                // Green filled portion (left of thumb)
+                int filledWidth = thumbRect.x + thumbRect.width / 2 - trackRect.x;
+                g2.setColor(new Color(50, 205, 50));
+                g2.fillRoundRect(trackRect.x, trackY - 2, filledWidth, 4, 4, 4);
+            }
+            @Override
+            public void paintThumb(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // green circle
+                int cx = thumbRect.x + thumbRect.width / 2;
+                int cy = thumbRect.y + thumbRect.height / 2;
+                int r = 5;
+                g2.setColor(new Color(50, 205, 50));
+                g2.fillOval(cx - r, cy - r, r * 2, r * 2);
+            }
+            @Override
+            public void paintFocus(Graphics g) {}
+        });
+        volumeSlider.setBorder(BorderFactory.createEmptyBorder());
+        volumeSlider.setOpaque(false);
 
-        
+        // initial volume
         AudioPlayer.setVolume(volumeSlider.getValue());
 
         volumeSlider.addChangeListener(e -> {
             AudioPlayer.setVolume(volumeSlider.getValue());
-            
             int val = volumeSlider.getValue();
             if (val == 0) {
                 volIcon.setText("🔇");
@@ -509,7 +655,6 @@ volumeSlider.setOpaque(false);
         albumLabel.setText("Album: " + album);
         yearLabel.setText("Year: —");
 
-        // new thread for song data
         new Thread(() -> {
             try {
                 Map<String, String> info = AudioPlayer.getSongInfo(songTitle);
@@ -758,5 +903,5 @@ volumeSlider.setOpaque(false);
                 };
             }
         });
-    }   
+    }
 }
