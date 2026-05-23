@@ -33,6 +33,13 @@ public class GUI extends JFrame {
     private String currentAlbum = "";
     private boolean isPlaying = false;
 
+    // progress slider var
+    private JSlider progressSlider;
+    private JLabel timeStart;
+    private JLabel timeEnd;
+    private javax.swing.Timer progressTimer;
+    private boolean seeking = false;
+
     public GUI() {
         setTitle("bbbrfbnbbb");
         setSize(1200, 700);
@@ -54,24 +61,24 @@ public class GUI extends JFrame {
 
         setJMenuBar(menuBar);
 
-        // Create main content panel with split pane
+        // Cmain content panel with split pane
         JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         mainSplitPane.setBackground(new Color(40, 40, 40));
         mainSplitPane.setDividerLocation(300);
         mainSplitPane.setDividerSize(8);
         styleSplitPane(mainSplitPane);
 
-        // LEFT PANEL - Library Tree
+        // left - Library Tree
         JPanel leftPanel = createLibraryPanel();
         mainSplitPane.setLeftComponent(leftPanel);
 
-        // RIGHT PANEL - Song List and Album Art
+        // right pannel song list pannel art
         JPanel rightPanel = createSongPanel();
         mainSplitPane.setRightComponent(rightPanel);
 
         add(mainSplitPane, BorderLayout.CENTER);
 
-        // BOTTOM PANEL - Controls
+        // bottom pannel control
         JPanel bottomPanel = createControlsPanel();
         add(bottomPanel, BorderLayout.SOUTH);
 
@@ -81,7 +88,7 @@ public class GUI extends JFrame {
 
     private Icon makeEmojiIcon(String emoji) {
     return new Icon() {
-        public int getIconWidth()  { return 12; }  // was 18
+        public int getIconWidth()  { return 12; }  
         public int getIconHeight() { return 18; }
         public void paintIcon(Component c, Graphics g, int x, int y) {
             g.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
@@ -95,7 +102,7 @@ public class GUI extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.BLACK);
 
-        // Build library tree
+        // library tree
         rootNode = new DefaultMutableTreeNode("Library");
         String[] artists = AudioPlayer.getArtists();
 
@@ -175,6 +182,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         JScrollPane treeScroll = new JScrollPane(libraryTree);
         treeScroll.setBackground(Color.BLACK);
         treeScroll.getViewport().setBackground(Color.BLACK);
+        styleScrollBar(treeScroll);
 
         JLabel libraryLabel = new JLabel("  Library");
         libraryLabel.setBackground(Color.BLACK);
@@ -187,11 +195,11 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         return panel;
     }
 
-    private JPanel createSongPanel() {
+    private JPanel createSongPanel() 
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.BLACK);
 
-        // Song table - only # and Title now
+        // song pannel nr and title
         String[] columnNames = {"#", "Title"};
         DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
@@ -231,8 +239,9 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         JScrollPane songScroll = new JScrollPane(songTableView);
         songScroll.setBackground(Color.BLACK);
         songScroll.getViewport().setBackground(Color.BLACK);
+        styleScrollBar(songScroll);
 
-        // LEFT side of top panel: Album Art
+        // left side of top pannel artwork
         JPanel artPanel = new JPanel(new BorderLayout());
         artPanel.setBackground(Color.BLACK);
         artPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -247,7 +256,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
 
         artPanel.add(albumArtLabel, BorderLayout.CENTER);
 
-        // RIGHT side of top panel: Song info
+        // song info right side
         JPanel infoPanel = new JPanel();
         infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
         infoPanel.setBackground(Color.BLACK);
@@ -264,17 +273,17 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         sep.setBackground(new Color(60, 60, 60));
         sep.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        artistLabel = new JLabel("Artist: \u2014");
+        artistLabel = new JLabel("Artist: —");
         artistLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         artistLabel.setForeground(new Color(150, 150, 150));
         artistLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        albumLabel = new JLabel("Album: \u2014");
+        albumLabel = new JLabel("Album: —");
         albumLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         albumLabel.setForeground(new Color(150, 150, 150));
         albumLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        yearLabel = new JLabel("Year: \u2014");
+        yearLabel = new JLabel("Year: —");
         yearLabel.setFont(new Font("SansSerif", Font.PLAIN, 14));
         yearLabel.setForeground(new Color(150, 150, 150));
         yearLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -290,7 +299,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         infoPanel.add(yearLabel);
         infoPanel.add(Box.createVerticalGlue());
 
-        // Horizontal split: art | info
+        // horizontal split art|info
         JSplitPane topSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         topSplit.setDividerLocation(210);
         topSplit.setDividerSize(6);
@@ -298,7 +307,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         topSplit.setLeftComponent(artPanel);
         topSplit.setRightComponent(infoPanel);
 
-        // Vertical split: top info | song list
+        // vertical split: top info | song list
         JSplitPane mainSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         mainSplit.setBackground(new Color(40, 40, 40));
         mainSplit.setDividerLocation(220);
@@ -318,49 +327,98 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         panel.setBackground(Color.BLACK);
         panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
-        // Progress bar
+        // progress bar
         JPanel progressPanel = new JPanel(new BorderLayout());
         progressPanel.setBackground(Color.BLACK);
-        JLabel timeStart = new JLabel("00:00");
+
+        timeStart = new JLabel("00:00");
         timeStart.setForeground(new Color(50, 205, 50));
-        JLabel timeEnd = new JLabel("00:00");
+        timeEnd = new JLabel("00:00");
         timeEnd.setForeground(new Color(50, 205, 50));
-        JSlider progressSlider = new JSlider(0, 100, 0);
+
+        progressSlider = new JSlider(0, 1000, 0);
         progressSlider.setBackground(Color.BLACK);
-        progressSlider.setForeground(new Color(100, 150, 200));
+        progressSlider.setUI(new javax.swing.plaf.basic.BasicSliderUI(progressSlider) {
+            @Override
+            public void paintTrack(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int trackY = trackRect.y + trackRect.height / 2;
+                g2.setColor(new Color(50, 50, 50));
+                g2.fillRoundRect(trackRect.x, trackY - 2, trackRect.width, 4, 4, 4);
+                int filledWidth = thumbRect.x + thumbRect.width / 2 - trackRect.x;
+                g2.setColor(new Color(50, 205, 50));
+                g2.fillRoundRect(trackRect.x, trackY - 2, filledWidth, 4, 4, 4);
+            }
+            @Override
+            public void paintThumb(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int cx = thumbRect.x + thumbRect.width / 2;
+                int cy = thumbRect.y + thumbRect.height / 2;
+                g2.setColor(new Color(50, 205, 50));
+                g2.fillOval(cx - 5, cy - 5, 10, 10);
+            }
+            @Override
+            public void paintFocus(Graphics g) {}
+        });
+        progressSlider.setBorder(BorderFactory.createEmptyBorder());
+        progressSlider.setOpaque(false);
+
+        progressSlider.addMouseListener(new MouseAdapter() {
+    @Override
+    public void mousePressed(MouseEvent e) {
+        seeking = true;
+        // jump  to clicked position
+        int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
+        progressSlider.setValue(value);
+    }
+    @Override
+    public void mouseReleased(MouseEvent e) {
+        seeking = false;
+        int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
+        progressSlider.setValue(value);
+        int total = AudioPlayer.getTotalSeconds();
+        if (total > 0) {
+            int target = (int)(value / 1000.0 * total);
+            new Thread(() -> AudioPlayer.seekTo(target)).start();
+        }
+    }
+});
+
         progressPanel.add(timeStart, BorderLayout.WEST);
         progressPanel.add(progressSlider, BorderLayout.CENTER);
         progressPanel.add(timeEnd, BorderLayout.EAST);
         panel.add(progressPanel);
         panel.add(Box.createRigidArea(new Dimension(0, 10)));
 
-        // Row: [shuffle | prev | play | next | repeat] centered, [volume] right-aligned
+        // shuffle  prev  play  next  repeat centered volume
         JPanel buttonRow = new JPanel(new BorderLayout());
         buttonRow.setBackground(Color.BLACK);
 
-        // Left spacer to balance the volume panel on the right
+        // left spacer to balance volume slider
         JPanel leftSpacer = new JPanel();
         leftSpacer.setBackground(Color.BLACK);
         leftSpacer.setPreferredSize(new Dimension(160, 1));
         buttonRow.add(leftSpacer, BorderLayout.WEST);
 
-        // Center: playback buttons
+        //  playback buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
         buttonPanel.setBackground(Color.BLACK);
 
-        JButton prevBtn = createIconButton("\u23EE", 24);
+        JButton prevBtn = createIconButton("⏮", 24);
         prevBtn.addActionListener(e -> playPrevious());
 
-        playPauseBtn = createIconButton("\u25B6", 32);
+        playPauseBtn = createIconButton("▶", 32);
         playPauseBtn.addActionListener(e -> togglePlayPause());
 
-        JButton nextBtn = createIconButton("\u23ED", 24);
+        JButton nextBtn = createIconButton("⏭", 24);
         nextBtn.addActionListener(e -> playNext());
 
-        JButton repeatBtn = createIconButton("\uD83D\uDD01", 20);
+        JButton repeatBtn = createIconButton("🔁", 20);
         repeatBtn.addActionListener(e -> playCurrentAgain());
 
-        JButton shuffleBtn = createIconButton("\uD83D\uDD00", 20);
+        JButton shuffleBtn = createIconButton("🔀", 20);
         shuffleBtn.addActionListener(e -> shufflePlay());
 
         buttonPanel.add(shuffleBtn);
@@ -370,12 +428,12 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         buttonPanel.add(repeatBtn);
         buttonRow.add(buttonPanel, BorderLayout.CENTER);
 
-        // Right: volume icon + slider
+        //  volume icon + slider
         JPanel volumePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         volumePanel.setBackground(Color.BLACK);
         volumePanel.setPreferredSize(new Dimension(160, 1));
 
-        JLabel volIcon = new JLabel("\uD83D\uDD0A"); // 🔊
+        JLabel volIcon = new JLabel("🔊");
         volIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
         volIcon.setForeground(new Color(50, 205, 50));
 
@@ -392,7 +450,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
         // Dark background track
         g2.setColor(new Color(50, 50, 50));
         g2.fillRoundRect(trackRect.x, trackY - 2, trackRect.width, 4, 4, 4);
-        // Green filled portion (left of thumb)
+        // color design
         int filledWidth = thumbRect.x + thumbRect.width / 2 - trackRect.x;
         g2.setColor(new Color(50, 205, 50));
         g2.fillRoundRect(trackRect.x, trackY - 2, filledWidth, 4, 4, 4);
@@ -401,7 +459,7 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
     public void paintThumb(Graphics g) {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        // Small green circle, no border
+        // green circle
         int cx = thumbRect.x + thumbRect.width / 2;
         int cy = thumbRect.y + thumbRect.height / 2;
         int r = 5;
@@ -414,21 +472,21 @@ libraryTree.setCellRenderer(new DefaultTreeCellRenderer() {
 volumeSlider.setBorder(BorderFactory.createEmptyBorder()); // removes white outline
 volumeSlider.setOpaque(false);
 
-        // Set initial volume
+        
         AudioPlayer.setVolume(volumeSlider.getValue());
 
         volumeSlider.addChangeListener(e -> {
             AudioPlayer.setVolume(volumeSlider.getValue());
-            // Update icon based on level
+            
             int val = volumeSlider.getValue();
             if (val == 0) {
-                volIcon.setText("\uD83D\uDD07"); // 🔇
+                volIcon.setText("🔇");
             } else if (val < 40) {
-                volIcon.setText("\uD83D\uDD08"); // 🔈
+                volIcon.setText("🔈");
             } else if (val < 70) {
-                volIcon.setText("\uD83D\uDD09"); // 🔉
+                volIcon.setText("🔉");
             } else {
-                volIcon.setText("\uD83D\uDD0A"); // 🔊
+                volIcon.setText("🔊");
             }
         });
 
@@ -449,19 +507,19 @@ volumeSlider.setOpaque(false);
         titleLabel.setText(songTitle);
         artistLabel.setText("Artist: " + artist);
         albumLabel.setText("Album: " + album);
-        yearLabel.setText("Year: \u2014");
+        yearLabel.setText("Year: —");
 
-        // Fetch year from metadata asynchronously
+        // new thread for song data
         new Thread(() -> {
             try {
                 Map<String, String> info = AudioPlayer.getSongInfo(songTitle);
                 String year = info.getOrDefault("YEAR",
                               info.getOrDefault("DATE",
                               info.getOrDefault("ORIGINALYEAR", "")));
-                String displayYear = (year == null || year.isEmpty()) ? "\u2014" : year;
+                String displayYear = (year == null || year.isEmpty()) ? "—" : year;
                 SwingUtilities.invokeLater(() -> yearLabel.setText("Year: " + displayYear));
             } catch (Exception e) {
-                SwingUtilities.invokeLater(() -> yearLabel.setText("Year: \u2014"));
+                SwingUtilities.invokeLater(() -> yearLabel.setText("Year: —"));
             }
         }).start();
 
@@ -470,9 +528,28 @@ volumeSlider.setOpaque(false);
         new Thread(() -> AudioPlayer.playSong(songTitle)).start();
 
         isPlaying = true;
-        playPauseBtn.setText("\u23F8");
+        playPauseBtn.setText("⏸");
+
+        // start progress timer
+        if (progressTimer != null) progressTimer.stop();
+        progressTimer = new javax.swing.Timer(500, e -> {
+            if (!seeking) {
+                int total = AudioPlayer.getTotalSeconds();
+                int current = AudioPlayer.getCurrentSeconds();
+                if (total > 0) {
+                    progressSlider.setValue((int)(current * 1000.0 / total));
+                }
+                timeStart.setText(formatTime(current));
+                timeEnd.setText(formatTime(total));
+            }
+        });
+        progressTimer.start();
 
         updateSongList(artist, album, songTitle);
+    }
+
+    private String formatTime(int seconds) {
+        return String.format("%02d:%02d", seconds / 60, seconds % 60);
     }
 
     private void updateSongList(String artist, String album, String selectedSong) {
@@ -555,11 +632,11 @@ volumeSlider.setOpaque(false);
 
         if (isPlaying) {
             AudioPlayer.pauseSong();
-            playPauseBtn.setText("\u25B6");
+            playPauseBtn.setText("▶");
             isPlaying = false;
         } else {
             AudioPlayer.resumeSong();
-            playPauseBtn.setText("\u23F8");
+            playPauseBtn.setText("⏸");
             isPlaying = true;
         }
     }
@@ -626,6 +703,47 @@ volumeSlider.setOpaque(false);
         return btn;
     }
 
+    private void styleScrollBar(JScrollPane scrollPane) {
+        scrollPane.getVerticalScrollBar().setUI(new javax.swing.plaf.basic.BasicScrollBarUI() {
+            @Override
+            protected void configureScrollBarColors() {
+                thumbColor = new Color(100, 100, 100);
+                trackColor = new Color(20, 20, 20);
+            }
+            @Override
+            protected JButton createDecreaseButton(int orientation) { return invisibleButton(); }
+            @Override
+            protected JButton createIncreaseButton(int orientation) { return invisibleButton(); }
+            private JButton invisibleButton() {
+                JButton btn = new JButton();
+                btn.setPreferredSize(new Dimension(0, 0));
+                btn.setMinimumSize(new Dimension(0, 0));
+                btn.setMaximumSize(new Dimension(0, 0));
+                return btn;
+            }
+        });
+        scrollPane.getVerticalScrollBar().setBackground(new Color(20, 20, 20));
+        scrollPane.getHorizontalScrollBar().setUI(new javax.swing.plaf.basic.BasicScrollBarUI() {
+            @Override
+            protected void configureScrollBarColors() {
+                thumbColor = new Color(100, 100, 100);
+                trackColor = new Color(20, 20, 20);
+            }
+            @Override
+            protected JButton createDecreaseButton(int orientation) { return invisibleButton(); }
+            @Override
+            protected JButton createIncreaseButton(int orientation) { return invisibleButton(); }
+            private JButton invisibleButton() {
+                JButton btn = new JButton();
+                btn.setPreferredSize(new Dimension(0, 0));
+                btn.setMinimumSize(new Dimension(0, 0));
+                btn.setMaximumSize(new Dimension(0, 0));
+                return btn;
+            }
+        });
+        scrollPane.getHorizontalScrollBar().setBackground(new Color(20, 20, 20));
+    }
+
     private void styleSplitPane(JSplitPane splitPane) {
         splitPane.setUI(new BasicSplitPaneUI() {
             @Override
@@ -640,5 +758,5 @@ volumeSlider.setOpaque(false);
                 };
             }
         });
-    }
+    }   
 }

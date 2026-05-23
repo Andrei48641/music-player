@@ -10,6 +10,8 @@ import java.io.FileInputStream;
 import java.io.BufferedInputStream;
 import java.sql.*;
 import java.util.*;
+import org.jaudiotagger.audio.AudioFile;
+import org.jaudiotagger.audio.AudioFileIO;
 
 public class AudioPlayer {
 
@@ -26,6 +28,10 @@ public class AudioPlayer {
     
     //  volume field
     private static volatile float currentVolume = 0.8f;
+
+    // progress tracking
+    private static volatile int framesPlayed = 0;
+    private static volatile int totalSeconds = 0;
 
     public static void setOnSongFinishedCallback(Runnable callback) {
         onSongFinishedCallback = callback;
@@ -45,10 +51,32 @@ public class AudioPlayer {
         }
     }
 
+    public static int getCurrentSeconds() {
+        return (int)(framesPlayed * 1152.0 / 44100.0);
+    }
+
+    public static int getTotalSeconds() {
+        return totalSeconds;
+    }
+
+    public static void seekTo(int seconds) {
+        if (currentPath.isEmpty()) return;
+        int targetFrame = (int)(seconds * 44100.0 / 1152.0);
+        manuallyStopped = true;
+        if (sourceLine != null) { sourceLine.stop(); sourceLine.flush(); sourceLine.close(); sourceLine = null; }
+        if (playerThread != null) { playerThread.interrupt(); playerThread = null; }
+        manuallyStopped = false;
+        isPaused = false;
+        framesPlayed = targetFrame;
+        pausedFrame = targetFrame;
+        playFromFrame(targetFrame);
+    }
+
     // 
     public static void playSong(String songTitle) {
         stopSong();
         pausedFrame = 0;
+        framesPlayed = 0;
         isPaused = false;
         manuallyStopped = false;
 
@@ -56,6 +84,15 @@ public class AudioPlayer {
         if (currentPath.isEmpty()) {
             System.err.println("ERROR song not found in database");
             return;
+        }
+
+        // get total duration
+        try {
+            String wp = currentPath.replace("/mnt/HDD1TB", "X:").replace("/", "\\");
+            AudioFile af = AudioFileIO.read(new java.io.File(wp));
+            totalSeconds = af.getAudioHeader().getTrackLength();
+        } catch (Exception e) {
+            totalSeconds = 0;
         }
 
         playFromFrame(pausedFrame);
@@ -128,13 +165,13 @@ public class AudioPlayer {
                 AudioFormat format = new AudioFormat(44100, 16, 2, true, false);
                 DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
                 sourceLine = (SourceDataLine) AudioSystem.getLine(info);
-                sourceLine.open(format);
+                sourceLine.open(format, 65536);
                 sourceLine.start();
 
                 // apply current volume immediately
                 setVolume((int)(currentVolume * 100));
 
-                int frameCount = startFrame;
+                framesPlayed = startFrame;
                 Header header;
                 while (!manuallyStopped && (header = bitstream.readFrame()) != null) {
                     SampleBuffer output = (SampleBuffer) decoder.decodeFrame(header, bitstream);
@@ -151,10 +188,10 @@ public class AudioPlayer {
 
                     sourceLine.write(pcm, 0, pcm.length);
                     bitstream.closeFrame();
-                    frameCount++;
+                    framesPlayed++;
                 }
 
-                pausedFrame = frameCount;
+                pausedFrame = framesPlayed;
                 sourceLine.drain();
                 sourceLine.close();
                 bitstream.close();
