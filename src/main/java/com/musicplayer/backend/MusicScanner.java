@@ -56,9 +56,16 @@ public class MusicScanner {
             int artistId = getOrCreateArtist(statement, tag.getFirst(FieldKey.ARTIST).replace("'", "''"));
             int albumId = getOrCreateAlbum(statement, tag.getFirst(FieldKey.ALBUM).replace("'", "''"), artistId);
 
-            statement.execute("INSERT INTO SONGS (TITLE, ALBUM_ID, FILE_PATH) VALUES ('"
+            String year = tag.getFirst(FieldKey.YEAR);
+            if (year == null || year.isEmpty()) {
+                year = "NULL";
+            } else {
+                year = "'" + year.replace("'", "''") + "'";
+            }
+
+            statement.execute("INSERT INTO SONGS (TITLE, ALBUM_ID, FILE_PATH, \"YEAR\") VALUES ('"
                     + tag.getFirst(FieldKey.TITLE).replace("'", "''") + "', " + albumId + ", '"
-                    + linuxPath.replace("'", "''") + "')");
+                    + linuxPath.replace("'", "''") + "', " + year + ")");
 
             System.out.println("debug CHECKED " + tag.getFirst(FieldKey.ARTIST) + " - " + tag.getFirst(FieldKey.TITLE));
 
