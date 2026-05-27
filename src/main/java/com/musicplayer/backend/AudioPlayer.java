@@ -1,9 +1,6 @@
 package com.musicplayer.backend;
 
 import javazoom.jl.decoder.*;
-import javazoom.jl.player.advanced.PlaybackEvent;
-import javazoom.jl.player.advanced.PlaybackListener;
-
 import javax.sound.sampled.*;
 import javax.swing.SwingUtilities;
 import java.io.FileInputStream;
@@ -25,7 +22,7 @@ public class AudioPlayer {
     private static boolean manuallyStopped = false;
     private static Runnable onSongFinishedCallback;
 
-    //  volume field
+    // volume field
     private static volatile float currentVolume = 0.8f;
 
     // progress tracking
@@ -36,7 +33,7 @@ public class AudioPlayer {
         onSongFinishedCallback = callback;
     }
 
-    //  called from GUI with 0-100
+    // called from GUI with 0-100
     public static void setVolume(int volume) {
         currentVolume = volume / 100f;
         // apply to live line if playing
@@ -44,14 +41,14 @@ public class AudioPlayer {
                 && sourceLine.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
             FloatControl gain = (FloatControl) sourceLine.getControl(FloatControl.Type.MASTER_GAIN);
             float dB = currentVolume == 0 ? gain.getMinimum()
-                     : (float)(Math.log10(currentVolume) * 20.0);
+                    : (float) (Math.log10(currentVolume) * 20.0);
             dB = Math.max(gain.getMinimum(), Math.min(gain.getMaximum(), dB));
             gain.setValue(dB);
         }
     }
 
     public static int getCurrentSeconds() {
-        return (int)(framesPlayed * 1152.0 / 44100.0);
+        return (int) (framesPlayed * 1152.0 / 44100.0);
     }
 
     public static int getTotalSeconds() {
@@ -59,11 +56,20 @@ public class AudioPlayer {
     }
 
     public static void seekTo(int seconds) {
-        if (currentPath.isEmpty()) return;
-        int targetFrame = (int)(seconds * 44100.0 / 1152.0);
+        if (currentPath.isEmpty())
+            return;
+        int targetFrame = (int) (seconds * 44100.0 / 1152.0);
         manuallyStopped = true;
-        if (sourceLine != null) { sourceLine.stop(); sourceLine.flush(); sourceLine.close(); sourceLine = null; }
-        if (playerThread != null) { playerThread.interrupt(); playerThread = null; }
+        if (sourceLine != null) {
+            sourceLine.stop();
+            sourceLine.flush();
+            sourceLine.close();
+            sourceLine = null;
+        }
+        if (playerThread != null) {
+            playerThread.interrupt();
+            playerThread = null;
+        }
         manuallyStopped = false;
         isPaused = false;
         framesPlayed = targetFrame;
@@ -143,7 +149,7 @@ public class AudioPlayer {
         System.out.println("Music stopped!");
     }
 
-    //  Bitstream+Decoder+SourceDataLine 
+    // Bitstream+Decoder+SourceDataLine
     private static void playFromFrame(int startFrame) {
         playerThread = new Thread(() -> {
             try {
@@ -157,7 +163,8 @@ public class AudioPlayer {
                 // skip to startFrame
                 for (int i = 0; i < startFrame; i++) {
                     Header h = bitstream.readFrame();
-                    if (h == null) break;
+                    if (h == null)
+                        break;
                     bitstream.closeFrame();
                 }
 
@@ -168,7 +175,7 @@ public class AudioPlayer {
                 sourceLine.start();
 
                 // apply current volume immediately
-                setVolume((int)(currentVolume * 100));
+                setVolume((int) (currentVolume * 100));
 
                 framesPlayed = startFrame;
                 Header header;
@@ -180,9 +187,9 @@ public class AudioPlayer {
                     // software volume scaling as fallback
                     byte[] pcm = new byte[len * 2];
                     for (int i = 0; i < len; i++) {
-                        short scaled = (short)(samples[i] * currentVolume);
-                        pcm[i * 2]     = (byte)(scaled & 0xFF);
-                        pcm[i * 2 + 1] = (byte)((scaled >> 8) & 0xFF);
+                        short scaled = (short) (samples[i] * currentVolume);
+                        pcm[i * 2] = (byte) (scaled & 0xFF);
+                        pcm[i * 2 + 1] = (byte) ((scaled >> 8) & 0xFF);
                     }
 
                     sourceLine.write(pcm, 0, pcm.length);
@@ -212,10 +219,11 @@ public class AudioPlayer {
 
     private static String getPathFromDB(String songTitle) {
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement("SELECT FILE_PATH FROM SONGS WHERE TITLE = ?")) {
+                PreparedStatement stmt = conn.prepareStatement("SELECT FILE_PATH FROM SONGS WHERE TITLE = ?")) {
             stmt.setString(1, songTitle);
             ResultSet rs = stmt.executeQuery();
-            if (rs.next()) return rs.getString("FILE_PATH");
+            if (rs.next())
+                return rs.getString("FILE_PATH");
         } catch (SQLException e) {
             System.err.println("database ERROR " + e.getMessage());
         }
@@ -225,9 +233,10 @@ public class AudioPlayer {
     public static String[] getPlaylist() {
         ArrayList<String> songs = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
-             Statement statement = conn.createStatement()) {
+                Statement statement = conn.createStatement()) {
             ResultSet rs = statement.executeQuery("SELECT TITLE FROM SONGS ORDER BY TITLE");
-            while (rs.next()) songs.add(rs.getString("TITLE"));
+            while (rs.next())
+                songs.add(rs.getString("TITLE"));
         } catch (SQLException e) {
             System.err.println("ERROR loading playlist: " + e.getMessage());
         }
@@ -237,9 +246,10 @@ public class AudioPlayer {
     public static String[] getArtists() {
         ArrayList<String> artists = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
-             Statement statement = conn.createStatement()) {
+                Statement statement = conn.createStatement()) {
             ResultSet rs = statement.executeQuery("SELECT NAME FROM ARTISTS ORDER BY NAME");
-            while (rs.next()) artists.add(rs.getString("NAME"));
+            while (rs.next())
+                artists.add(rs.getString("NAME"));
         } catch (SQLException e) {
             System.err.println("ERROR loading artists: " + e.getMessage());
         }
@@ -249,13 +259,14 @@ public class AudioPlayer {
     public static String[] getAlbumsForArtist(String artistName) {
         ArrayList<String> albums = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "SELECT DISTINCT A.TITLE FROM ALBUMS A " +
-                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
-                "WHERE AR.NAME = ? ORDER BY A.TITLE")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT DISTINCT A.TITLE FROM ALBUMS A " +
+                                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
+                                "WHERE AR.NAME = ? ORDER BY A.TITLE")) {
             stmt.setString(1, artistName);
             ResultSet rs = stmt.executeQuery();
-            while (rs.next()) albums.add(rs.getString("TITLE"));
+            while (rs.next())
+                albums.add(rs.getString("TITLE"));
         } catch (SQLException e) {
             System.err.println("ERROR loading albums: " + e.getMessage());
         }
@@ -265,15 +276,16 @@ public class AudioPlayer {
     public static String[] getSongsForAlbum(String artistName, String albumTitle) {
         ArrayList<String> songs = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "SELECT S.TITLE FROM SONGS S " +
-                "JOIN ALBUMS A ON S.ALBUM_ID = A.ID " +
-                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
-                "WHERE AR.NAME = ? AND A.TITLE = ? ORDER BY S.TITLE")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT S.TITLE FROM SONGS S " +
+                                "JOIN ALBUMS A ON S.ALBUM_ID = A.ID " +
+                                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
+                                "WHERE AR.NAME = ? AND A.TITLE = ? ORDER BY S.TITLE")) {
             stmt.setString(1, artistName);
             stmt.setString(2, albumTitle);
             ResultSet rs = stmt.executeQuery();
-            while (rs.next()) songs.add(rs.getString("TITLE"));
+            while (rs.next())
+                songs.add(rs.getString("TITLE"));
         } catch (SQLException e) {
             System.err.println("ERROR loading songs: " + e.getMessage());
         }
@@ -283,12 +295,12 @@ public class AudioPlayer {
     public static Map<String, String> getSongInfo(String songTitle) {
         Map<String, String> info = new HashMap<>();
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "SELECT S.TITLE, S.FILE_PATH, A.TITLE AS ALBUM, AR.NAME AS ARTIST " +
-                "FROM SONGS S " +
-                "JOIN ALBUMS A ON S.ALBUM_ID = A.ID " +
-                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
-                "WHERE S.TITLE = ?")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT S.TITLE, S.FILE_PATH, A.TITLE AS ALBUM, AR.NAME AS ARTIST " +
+                                "FROM SONGS S " +
+                                "JOIN ALBUMS A ON S.ALBUM_ID = A.ID " +
+                                "JOIN ARTISTS AR ON A.ARTIST_ID = AR.ID " +
+                                "WHERE S.TITLE = ?")) {
             stmt.setString(1, songTitle);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
@@ -307,8 +319,8 @@ public class AudioPlayer {
 
     public static void createPlaylist(String name) {
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "INSERT INTO PLAYLISTS (NAME) VALUES (?)")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "INSERT INTO PLAYLISTS (NAME) VALUES (?)")) {
             stmt.setString(1, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
@@ -318,8 +330,8 @@ public class AudioPlayer {
 
     public static void deletePlaylist(int playlistId) {
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "DELETE FROM PLAYLISTS WHERE ID = ?")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "DELETE FROM PLAYLISTS WHERE ID = ?")) {
             stmt.setInt(1, playlistId);
             stmt.executeUpdate();
         } catch (SQLException e) {
@@ -330,7 +342,7 @@ public class AudioPlayer {
     public static Map<Integer, String> getPlaylists() {
         Map<Integer, String> playlists = new LinkedHashMap<>();
         try (Connection conn = DatabaseManager.getConnection();
-             Statement stmt = conn.createStatement()) {
+                Statement stmt = conn.createStatement()) {
             ResultSet rs = stmt.executeQuery("SELECT ID, NAME FROM PLAYLISTS ORDER BY NAME");
             while (rs.next()) {
                 playlists.put(rs.getInt("ID"), rs.getString("NAME"));
@@ -343,14 +355,14 @@ public class AudioPlayer {
 
     public static void addSongToPlaylist(int playlistId, String songTitle) {
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement getSong = conn.prepareStatement(
-                "SELECT ID FROM SONGS WHERE TITLE = ?")) {
+                PreparedStatement getSong = conn.prepareStatement(
+                        "SELECT ID FROM SONGS WHERE TITLE = ?")) {
             getSong.setString(1, songTitle);
             ResultSet rs = getSong.executeQuery();
             if (rs.next()) {
                 int songId = rs.getInt("ID");
                 PreparedStatement insert = conn.prepareStatement(
-                    "INSERT INTO PLAYLIST_SONGS (PLAYLIST_ID, SONG_ID) VALUES (?, ?)");
+                        "INSERT INTO PLAYLIST_SONGS (PLAYLIST_ID, SONG_ID) VALUES (?, ?)");
                 insert.setInt(1, playlistId);
                 insert.setInt(2, songId);
                 insert.executeUpdate();
@@ -363,13 +375,14 @@ public class AudioPlayer {
     public static String[] getSongsForPlaylist(int playlistId) {
         ArrayList<String> songs = new ArrayList<>();
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "SELECT S.TITLE FROM SONGS S " +
-                "JOIN PLAYLIST_SONGS PS ON S.ID = PS.SONG_ID " +
-                "WHERE PS.PLAYLIST_ID = ?")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT S.TITLE FROM SONGS S " +
+                                "JOIN PLAYLIST_SONGS PS ON S.ID = PS.SONG_ID " +
+                                "WHERE PS.PLAYLIST_ID = ?")) {
             stmt.setInt(1, playlistId);
             ResultSet rs = stmt.executeQuery();
-            while (rs.next()) songs.add(rs.getString("TITLE"));
+            while (rs.next())
+                songs.add(rs.getString("TITLE"));
         } catch (SQLException e) {
             System.err.println("ERROR loading playlist songs: " + e.getMessage());
         }
@@ -378,9 +391,9 @@ public class AudioPlayer {
 
     public static void removeSongFromPlaylist(int playlistId, String songTitle) {
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "DELETE FROM PLAYLIST_SONGS WHERE PLAYLIST_ID = ? AND SONG_ID = " +
-                "(SELECT ID FROM SONGS WHERE TITLE = ?)")) {
+                PreparedStatement stmt = conn.prepareStatement(
+                        "DELETE FROM PLAYLIST_SONGS WHERE PLAYLIST_ID = ? AND SONG_ID = " +
+                                "(SELECT ID FROM SONGS WHERE TITLE = ?)")) {
             stmt.setInt(1, playlistId);
             stmt.setString(2, songTitle);
             stmt.executeUpdate();
