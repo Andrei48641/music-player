@@ -102,21 +102,10 @@ public class GUI extends JFrame {
         // expand and load after window is visible
         SwingUtilities.invokeLater(() -> {
             refreshPlaylistsInTree();
-            libraryTree.expandPath(new TreePath(new Object[]{rootNode, libraryNode}));
+            libraryTree.expandPath(new TreePath(new Object[] { rootNode, libraryNode }));
         });
     }
 
-    private Icon makeEmojiIcon(String emoji) {
-        return new Icon() {
-            public int getIconWidth()  { return 12; }
-            public int getIconHeight() { return 18; }
-            public void paintIcon(Component c, Graphics g, int x, int y) {
-                g.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
-                g.setColor(new Color(50, 205, 50));
-                g.drawString(emoji, x, y + 14);
-            }
-        };
-    }
 
     private void createNewPlaylist() {
         String name = JOptionPane.showInputDialog(this, "Playlist name:", "New Playlist", JOptionPane.PLAIN_MESSAGE);
@@ -131,7 +120,7 @@ public class GUI extends JFrame {
         Map<Integer, String> playlists = AudioPlayer.getPlaylists();
         for (Map.Entry<Integer, String> entry : playlists.entrySet()) {
             DefaultMutableTreeNode plNode = new DefaultMutableTreeNode(
-                new PlaylistNode(entry.getKey(), entry.getValue()));
+                    new PlaylistNode(entry.getKey(), entry.getValue()));
             String[] songs = AudioPlayer.getSongsForPlaylist(entry.getKey());
             for (String song : songs) {
                 plNode.add(new DefaultMutableTreeNode(new PlaylistSongNode(entry.getKey(), song)));
@@ -141,20 +130,38 @@ public class GUI extends JFrame {
         DefaultTreeModel model = (DefaultTreeModel) libraryTree.getModel();
         model.reload();
         // re-expand playlists root
-        libraryTree.expandPath(new TreePath(new Object[]{rootNode, playlistsRootNode}));
+        libraryTree.expandPath(new TreePath(new Object[] { rootNode, playlistsRootNode }));
     }
 
     // helper classes to hold playlist data in tree nodes
     private static class PlaylistNode {
-        int id; String name;
-        PlaylistNode(int id, String name) { this.id = id; this.name = name; }
-        @Override public String toString() { return name; }
+        int id;
+        String name;
+
+        PlaylistNode(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
     }
 
     private static class PlaylistSongNode {
-        int playlistId; String songTitle;
-        PlaylistSongNode(int playlistId, String songTitle) { this.playlistId = playlistId; this.songTitle = songTitle; }
-        @Override public String toString() { return songTitle; }
+        int playlistId;
+        String songTitle;
+
+        PlaylistSongNode(int playlistId, String songTitle) {
+            this.playlistId = playlistId;
+            this.songTitle = songTitle;
+        }
+
+        @Override
+        public String toString() {
+            return songTitle;
+        }
     }
 
     private JPanel createLibraryPanel() {
@@ -215,11 +222,21 @@ public class GUI extends JFrame {
                     String label = userObj.toString();
                     int depth = node.getLevel();
                     switch (depth) {
-                        case 1: setText("🎧 " + label); break; // Library / Playlists
-                        case 2: setText("👤 " + label); break; // Artist
-                        case 3: setText("🎵 " + label); break; // Album
-                        case 4: setText("🎶 " + label); break; // Song
-                        default: setText(label); break;
+                        case 1:
+                            setText("🎧 " + label);
+                            break; // Library / Playlists
+                        case 2:
+                            setText("👤 " + label);
+                            break; // Artist
+                        case 3:
+                            setText("🎵 " + label);
+                            break; // Album
+                        case 4:
+                            setText("🎶 " + label);
+                            break; // Song
+                        default:
+                            setText(label);
+                            break;
                     }
                 }
 
@@ -232,7 +249,8 @@ public class GUI extends JFrame {
             @Override
             public void mouseClicked(MouseEvent e) {
                 TreePath path = libraryTree.getPathForLocation(e.getX(), e.getY());
-                if (path == null) return;
+                if (path == null)
+                    return;
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
                 Object userObj = node.getUserObject();
 
@@ -314,7 +332,7 @@ public class GUI extends JFrame {
                         deleteItem.setBackground(new Color(30, 30, 30));
                         deleteItem.addActionListener(ev -> {
                             int confirm = JOptionPane.showConfirmDialog(GUI.this,
-                                "Delete playlist \"" + pn.name + "\"?", "Confirm", JOptionPane.YES_NO_OPTION);
+                                    "Delete playlist \"" + pn.name + "\"?", "Confirm", JOptionPane.YES_NO_OPTION);
                             if (confirm == JOptionPane.YES_OPTION) {
                                 AudioPlayer.deletePlaylist(pn.id);
                                 refreshPlaylistsInTree();
@@ -348,7 +366,7 @@ public class GUI extends JFrame {
         panel.setBackground(Color.BLACK);
 
         // song table nr and title
-        String[] columnNames = {"#", "Title"};
+        String[] columnNames = { "#", "Title" };
         DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -498,6 +516,7 @@ public class GUI extends JFrame {
                 g2.setColor(new Color(50, 205, 50));
                 g2.fillRoundRect(trackRect.x, trackY - 2, filledWidth, 4, 4, 4);
             }
+
             @Override
             public void paintThumb(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
@@ -507,8 +526,10 @@ public class GUI extends JFrame {
                 g2.setColor(new Color(50, 205, 50));
                 g2.fillOval(cx - 5, cy - 5, 10, 10);
             }
+
             @Override
-            public void paintFocus(Graphics g) {}
+            public void paintFocus(Graphics g) {
+            }
         });
         progressSlider.setBorder(BorderFactory.createEmptyBorder());
         progressSlider.setOpaque(false);
@@ -517,17 +538,18 @@ public class GUI extends JFrame {
             @Override
             public void mousePressed(MouseEvent e) {
                 seeking = true;
-                int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
+                int value = (int) ((double) e.getX() / progressSlider.getWidth() * 1000);
                 progressSlider.setValue(value);
             }
+
             @Override
             public void mouseReleased(MouseEvent e) {
                 seeking = false;
-                int value = (int)((double) e.getX() / progressSlider.getWidth() * 1000);
+                int value = (int) ((double) e.getX() / progressSlider.getWidth() * 1000);
                 progressSlider.setValue(value);
                 int total = AudioPlayer.getTotalSeconds();
                 if (total > 0) {
-                    int target = (int)(value / 1000.0 * total);
+                    int target = (int) (value / 1000.0 * total);
                     new Thread(() -> AudioPlayer.seekTo(target)).start();
                 }
             }
@@ -602,6 +624,7 @@ public class GUI extends JFrame {
                 g2.setColor(new Color(50, 205, 50));
                 g2.fillRoundRect(trackRect.x, trackY - 2, filledWidth, 4, 4, 4);
             }
+
             @Override
             public void paintThumb(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
@@ -613,8 +636,10 @@ public class GUI extends JFrame {
                 g2.setColor(new Color(50, 205, 50));
                 g2.fillOval(cx - r, cy - r, r * 2, r * 2);
             }
+
             @Override
-            public void paintFocus(Graphics g) {}
+            public void paintFocus(Graphics g) {
+            }
         });
         volumeSlider.setBorder(BorderFactory.createEmptyBorder());
         volumeSlider.setOpaque(false);
@@ -659,8 +684,8 @@ public class GUI extends JFrame {
             try {
                 Map<String, String> info = AudioPlayer.getSongInfo(songTitle);
                 String year = info.getOrDefault("YEAR",
-                              info.getOrDefault("DATE",
-                              info.getOrDefault("ORIGINALYEAR", "")));
+                        info.getOrDefault("DATE",
+                                info.getOrDefault("ORIGINALYEAR", "")));
                 String displayYear = (year == null || year.isEmpty()) ? "—" : year;
                 SwingUtilities.invokeLater(() -> yearLabel.setText("Year: " + displayYear));
             } catch (Exception e) {
@@ -676,13 +701,14 @@ public class GUI extends JFrame {
         playPauseBtn.setText("⏸");
 
         // start progress timer
-        if (progressTimer != null) progressTimer.stop();
+        if (progressTimer != null)
+            progressTimer.stop();
         progressTimer = new javax.swing.Timer(500, e -> {
             if (!seeking) {
                 int total = AudioPlayer.getTotalSeconds();
                 int current = AudioPlayer.getCurrentSeconds();
                 if (total > 0) {
-                    progressSlider.setValue((int)(current * 1000.0 / total));
+                    progressSlider.setValue((int) (current * 1000.0 / total));
                 }
                 timeStart.setText(formatTime(current));
                 timeEnd.setText(formatTime(total));
@@ -704,7 +730,7 @@ public class GUI extends JFrame {
 
         int selectedRow = -1;
         for (int i = 0; i < songs.length; i++) {
-            model.addRow(new Object[]{i + 1, songs[i]});
+            model.addRow(new Object[] { i + 1, songs[i] });
             if (songs[i].equals(selectedSong)) {
                 selectedRow = i;
             }
@@ -742,7 +768,8 @@ public class GUI extends JFrame {
                                         byte[] imageData = (byte[]) getBinaryDataMethod.invoke(artwork);
 
                                         ImageIcon icon = new ImageIcon(imageData);
-                                        Image scaledImg = icon.getImage().getScaledInstance(180, 180, Image.SCALE_SMOOTH);
+                                        Image scaledImg = icon.getImage().getScaledInstance(180, 180,
+                                                Image.SCALE_SMOOTH);
 
                                         SwingUtilities.invokeLater(() -> {
                                             albumArtLabel.setIcon(new ImageIcon(scaledImg));
@@ -773,7 +800,8 @@ public class GUI extends JFrame {
     }
 
     private void togglePlayPause() {
-        if (currentSongTitle.isEmpty()) return;
+        if (currentSongTitle.isEmpty())
+            return;
 
         if (isPlaying) {
             AudioPlayer.pauseSong();
@@ -855,10 +883,17 @@ public class GUI extends JFrame {
                 thumbColor = new Color(100, 100, 100);
                 trackColor = new Color(20, 20, 20);
             }
+
             @Override
-            protected JButton createDecreaseButton(int orientation) { return invisibleButton(); }
+            protected JButton createDecreaseButton(int orientation) {
+                return invisibleButton();
+            }
+
             @Override
-            protected JButton createIncreaseButton(int orientation) { return invisibleButton(); }
+            protected JButton createIncreaseButton(int orientation) {
+                return invisibleButton();
+            }
+
             private JButton invisibleButton() {
                 JButton btn = new JButton();
                 btn.setPreferredSize(new Dimension(0, 0));
@@ -874,10 +909,17 @@ public class GUI extends JFrame {
                 thumbColor = new Color(100, 100, 100);
                 trackColor = new Color(20, 20, 20);
             }
+
             @Override
-            protected JButton createDecreaseButton(int orientation) { return invisibleButton(); }
+            protected JButton createDecreaseButton(int orientation) {
+                return invisibleButton();
+            }
+
             @Override
-            protected JButton createIncreaseButton(int orientation) { return invisibleButton(); }
+            protected JButton createIncreaseButton(int orientation) {
+                return invisibleButton();
+            }
+
             private JButton invisibleButton() {
                 JButton btn = new JButton();
                 btn.setPreferredSize(new Dimension(0, 0));

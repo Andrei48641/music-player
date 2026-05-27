@@ -14,24 +14,20 @@ public class DatabaseManager {
     public static void initPlaylistTables() {
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
             stmt.execute(
-                "CREATE TABLE IF NOT EXISTS PLAYLISTS (" +
-                "ID INT AUTO_INCREMENT PRIMARY KEY, " +
-                "NAME VARCHAR(255) NOT NULL)"
-            );
+                    "CREATE TABLE IF NOT EXISTS PLAYLISTS (" +
+                            "ID INT AUTO_INCREMENT PRIMARY KEY, " +
+                            "NAME VARCHAR(255) NOT NULL)");
             stmt.execute(
-                "CREATE TABLE IF NOT EXISTS PLAYLIST_SONGS (" +
-                "ID INT AUTO_INCREMENT PRIMARY KEY, " +
-                "PLAYLIST_ID INT NOT NULL, " +
-                "SONG_ID INT NOT NULL, " +
-                "FOREIGN KEY (PLAYLIST_ID) REFERENCES PLAYLISTS(ID) ON DELETE CASCADE, " +
-                "FOREIGN KEY (SONG_ID) REFERENCES SONGS(ID) ON DELETE CASCADE)"
-            );
+                    "CREATE TABLE IF NOT EXISTS PLAYLIST_SONGS (" +
+                            "ID INT AUTO_INCREMENT PRIMARY KEY, " +
+                            "PLAYLIST_ID INT NOT NULL, " +
+                            "SONG_ID INT NOT NULL, " +
+                            "FOREIGN KEY (PLAYLIST_ID) REFERENCES PLAYLISTS(ID) ON DELETE CASCADE, " +
+                            "FOREIGN KEY (SONG_ID) REFERENCES SONGS(ID) ON DELETE CASCADE)");
             System.out.println("Playlist tables ready.");
         } catch (SQLException e) {
             System.err.println("ERROR creating playlist tables: " + e.getMessage());
         }
     }
-
-    
 
 }
