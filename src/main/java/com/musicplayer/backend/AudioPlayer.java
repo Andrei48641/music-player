@@ -9,6 +9,8 @@ import java.sql.*;
 import java.util.*;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
+import org.jaudiotagger.tag.FieldKey;
+import org.jaudiotagger.tag.Tag;
 
 public class AudioPlayer {
 
@@ -28,6 +30,7 @@ public class AudioPlayer {
     // progress tracking
     private static volatile int framesPlayed = 0;
     private static volatile int totalSeconds = 0;
+    private static final Map<String, String> songYearCache = new HashMap<>();
 
     public static void setOnSongFinishedCallback(Runnable callback) {
         onSongFinishedCallback = callback;
@@ -308,12 +311,57 @@ public class AudioPlayer {
                 info.put("FILE_PATH", rs.getString("FILE_PATH"));
                 info.put("ALBUM", rs.getString("ALBUM"));
                 info.put("ARTIST", rs.getString("ARTIST"));
+                String filePath = rs.getString("FILE_PATH");
+                info.put("YEAR", extractYearFromFile(filePath));
             }
         } catch (SQLException e) {
             System.err.println("ERROR loading song info: " + e.getMessage());
         }
         return info;
     }
+
+    public static String getSongYear(String songTitle) {
+        if (songTitle == null || songTitle.isEmpty()) {
+            return "—";
+        }
+        synchronized (songYearCache) {
+            if (songYearCache.containsKey(songTitle)) {
+                return songYearCache.get(songTitle);
+            }
+        }
+        Map<String, String> info = getSongInfo(songTitle);
+        String year = info.getOrDefault("YEAR", "—");
+        cacheSongYear(songTitle, year);
+        return year;
+    }
+
+    public static void cacheSongYear(String songTitle, String year) {
+        if (songTitle == null || songTitle.isEmpty()) {
+            return;
+        }
+        if (year == null || year.isEmpty()) {
+            year = "—";
+        }
+        synchronized (songYearCache) {
+            songYearCache.put(songTitle, year);
+        }
+    }
+
+    private static String extractYearFromFile(String filePath) {
+        if (filePath == null || filePath.isEmpty()) {
+            return "—";
+        }
+        try {
+            String windowsPath = filePath.replace("/mnt/HDD1TB", "X:").replace("/", "\\");
+            AudioFile audioFile = AudioFileIO.read(new java.io.File(windowsPath));
+            Tag tag = audioFile.getTag();
+            String year = tag.getFirst(FieldKey.YEAR);
+            return year;
+        } catch (Exception e) {
+            return "—";
+        }
+    }
+
 
     // ── Playlist methods ──
 

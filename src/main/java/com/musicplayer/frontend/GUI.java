@@ -366,7 +366,7 @@ public class GUI extends JFrame {
         panel.setBackground(Color.BLACK);
 
         // song table nr and title
-        String[] columnNames = { "#", "Title" };
+        String[] columnNames = { "#", "Title" , "Year"};
         DefaultTableModel tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -388,6 +388,7 @@ public class GUI extends JFrame {
 
         songTableView.getColumnModel().getColumn(0).setPreferredWidth(40);
         songTableView.getColumnModel().getColumn(1).setPreferredWidth(450);
+        songTableView.getColumnModel().getColumn(2).setPreferredWidth(80);
 
         songTableView.addMouseListener(new MouseAdapter() {
             @Override
@@ -730,7 +731,8 @@ public class GUI extends JFrame {
 
         int selectedRow = -1;
         for (int i = 0; i < songs.length; i++) {
-            model.addRow(new Object[] { i + 1, songs[i] });
+            String songYear = AudioPlayer.getSongYear(songs[i]);
+            model.addRow(new Object[] { i + 1, songs[i], songYear });
             if (songs[i].equals(selectedSong)) {
                 selectedRow = i;
             }

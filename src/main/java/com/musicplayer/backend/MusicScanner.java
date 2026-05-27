@@ -11,7 +11,7 @@ import java.sql.*;
 public class MusicScanner {
 
     public static void startScan() {
-        File root = new File("X:/10_MUSIC/ALBUMS_TEST/");
+        File root = new File("X:/10_MUSIC/ALBUMS/");
 
         if (!root.exists()) {
             System.err.println("ERROR root folder doesn't exist (check tailscale/database) " + root.getAbsolutePath());
@@ -44,20 +44,30 @@ public class MusicScanner {
 
             String linuxPath = file.getAbsolutePath().replace("X:", "/mnt/HDD1TB").replace("\\", "/");
 
+            AudioFile audioFile = AudioFileIO.read(file);
+            Tag tag = audioFile.getTag();
+            if (tag == null) {
+                System.err.println("Skipping file with no metadata: " + file.getName());
+                return;
+            }
+
+            String artist = safeTag(tag.getFirst(FieldKey.ARTIST));
+            String album = safeTag(tag.getFirst(FieldKey.ALBUM));
+            String title = safeTag(tag.getFirst(FieldKey.TITLE));
+            String year = safeTag(tag.getFirst(FieldKey.YEAR));
+            AudioPlayer.cacheSongYear(title, year);
+
             ResultSet rs = statement
                     .executeQuery("SELECT 1 FROM SONGS WHERE FILE_PATH = '" + linuxPath.replace("'", "''") + "'");
             if (rs.next()) {
                 return;
             }
 
-            AudioFile audioFile = AudioFileIO.read(file);
-            Tag tag = audioFile.getTag();
-
-            int artistId = getOrCreateArtist(statement, tag.getFirst(FieldKey.ARTIST).replace("'", "''"));
-            int albumId = getOrCreateAlbum(statement, tag.getFirst(FieldKey.ALBUM).replace("'", "''"), artistId);
+            int artistId = getOrCreateArtist(statement, artist.replace("'", "''"));
+            int albumId = getOrCreateAlbum(statement, album.replace("'", "''"), artistId);
 
             statement.execute("INSERT INTO SONGS (TITLE, ALBUM_ID, FILE_PATH) VALUES ('"
-                    + tag.getFirst(FieldKey.TITLE).replace("'", "''") + "', " + albumId + ", '"
+                    + title.replace("'", "''") + "', " + albumId + ", '"
                     + linuxPath.replace("'", "''") + "')");
 
             System.out.println("debug CHECKED " + tag.getFirst(FieldKey.ARTIST) + " - " + tag.getFirst(FieldKey.TITLE));
@@ -81,5 +91,9 @@ public class MusicScanner {
                 .executeQuery("SELECT ID FROM ALBUMS WHERE TITLE = '" + title + "' AND ARTIST_ID = " + artistId);
         rs.next();
         return rs.getInt("ID");
+    }
+
+    private static String safeTag(String value) {
+        return value == null ? "" : value;
     }
 }
